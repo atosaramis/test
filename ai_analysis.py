@@ -58,7 +58,7 @@ def call_openrouter(
     prompt: str,
     model: str = "anthropic/claude-haiku-4.5",
     max_tokens: int = 3000
-) -> Optional[str]:
+) -> Dict:
     """
     Call OpenRouter API with specified Claude model.
 
@@ -68,12 +68,12 @@ def call_openrouter(
         max_tokens: Maximum tokens in response
 
     Returns:
-        Model response as string, or None if error
+        Dict with either {"content": str} or {"error": str}
     """
     api_key = get_credential("OPENROUTER_API_KEY")
 
     if not api_key:
-        raise ValueError("OPENROUTER_API_KEY environment variable not set")
+        return {"error": "OPENROUTER_API_KEY not configured"}
 
     url = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -96,54 +96,69 @@ def call_openrouter(
 
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=60)
+
+        # Get response text for error messages
+        response_text = response.text
+
         response.raise_for_status()
 
         data = response.json()
 
         if data.get("choices") and len(data["choices"]) > 0:
-            return data["choices"][0]["message"]["content"]
+            return {"content": data["choices"][0]["message"]["content"]}
         else:
-            return None
+            return {"error": f"No response from model. Response: {response_text[:500]}"}
+
+    except requests.exceptions.HTTPError as e:
+        # Capture HTTP error details
+        try:
+            error_data = response.json()
+            error_msg = error_data.get("error", {}).get("message", str(error_data))
+        except:
+            error_msg = response_text[:500]
+        return {"error": f"OpenRouter HTTP {response.status_code}: {error_msg}"}
 
     except requests.exceptions.RequestException as e:
-        print(f"OpenRouter API request failed: {e}")
-        return None
+        return {"error": f"OpenRouter API request failed: {str(e)}"}
+
     except Exception as e:
-        print(f"Error calling OpenRouter: {e}")
-        return None
+        return {"error": f"OpenRouter error: {str(e)}"}
 
 
-def parse_json_response(response: str) -> Optional[Dict]:
+def parse_json_response(response_dict: Dict) -> Dict:
     """
     Parse JSON from model response, handling markdown code blocks.
 
     Args:
-        response: Raw response from model
+        response_dict: Response dict from call_openrouter with "content" or "error"
 
     Returns:
-        Parsed JSON dict, or None if parsing fails
+        Parsed JSON dict, or error dict if parsing fails
     """
-    if not response:
-        return None
+    # Check if there was an API error
+    if response_dict.get("error"):
+        return {"error": response_dict["error"]}
+
+    response_text = response_dict.get("content")
+    if not response_text:
+        return {"error": "No content in API response"}
 
     # Remove markdown code blocks if present
-    response = response.strip()
-    if response.startswith("```json"):
-        response = response[7:]
-    elif response.startswith("```"):
-        response = response[3:]
+    response_text = response_text.strip()
+    if response_text.startswith("```json"):
+        response_text = response_text[7:]
+    elif response_text.startswith("```"):
+        response_text = response_text[3:]
 
-    if response.endswith("```"):
-        response = response[:-3]
+    if response_text.endswith("```"):
+        response_text = response_text[:-3]
 
-    response = response.strip()
+    response_text = response_text.strip()
 
     try:
-        return json.loads(response)
+        return json.loads(response_text)
     except json.JSONDecodeError as e:
-        print(f"Failed to parse JSON response: {e}")
-        print(f"Response was: {response[:500]}")
-        return None
+        return {"error": f"Failed to parse JSON: {str(e)}. Response: {response_text[:500]}"}
 
 
 def analyze_company_voice(
@@ -182,9 +197,10 @@ def analyze_company_voice(
     response = call_openrouter(prompt, model, max_tokens=2000)
     result = parse_json_response(response)
 
-    if not result:
+    # Check if parsing returned an error
+    if result.get("error"):
         return {
-            "error": "Failed to analyze voice profile",
+            "error": f"Failed to analyze voice profile: {result['error']}",
             "overall_tone": "unknown",
             "consistency_score": 0
         }
@@ -228,9 +244,10 @@ def analyze_content_strategy(
     response = call_openrouter(prompt, model, max_tokens=2000)
     result = parse_json_response(response)
 
-    if not result:
+    # Check if parsing returned an error
+    if result.get("error"):
         return {
-            "error": "Failed to analyze content strategy",
+            "error": f"Failed to analyze content strategy: {result['error']}",
             "content_pillar_distribution": {},
             "primary_focus": "unknown"
         }
@@ -279,9 +296,10 @@ def analyze_engagement_patterns(
     response = call_openrouter(prompt, model, max_tokens=2500)
     result = parse_json_response(response)
 
-    if not result:
+    # Check if parsing returned an error
+    if result.get("error"):
         return {
-            "error": "Failed to analyze engagement",
+            "error": f"Failed to analyze engagement: {result['error']}",
             "avg_engagement": {},
             "top_performing_content_types": []
         }
@@ -397,9 +415,10 @@ def generate_content(
     response = call_openrouter(prompt, model, max_tokens=2000)
     result = parse_json_response(response)
 
-    if not result:
+    # Check if parsing returned an error
+    if result.get("error"):
         return {
-            "error": "Failed to generate content",
+            "error": f"Failed to generate content: {result['error']}",
             "post_text": "Generation failed. Please try again."
         }
 
