@@ -1,0 +1,27 @@
+Analyze this company's overall voice and tone based on their recent LinkedIn posts.
+
+COMPANY: {company_name}
+POSTS ANALYZED: {num_posts}
+
+ALL POSTS TEXT (most recent first):
+{all_posts_text}
+
+Return ONLY a valid JSON object (no markdown, no code blocks):
+{{
+  "overall_tone": "professional|casual|inspirational|technical|conversational|authoritative",
+  "consistency_score": 8.5,
+  "writing_style": "data-driven|storytelling|technical|accessible|academic|conversational",
+  "formality_level": "formal|professional|casual",
+  "personality_traits": ["innovative", "safety-focused", "research-driven", "empathetic"],
+  "target_audience": "Brief description of who they're speaking to",
+  "unique_voice_characteristics": "What makes their voice distinctive and recognizable",
+  "voice_consistency": "How consistent their voice is across posts (1-10 scale)",
+  "communication_approach": "How they communicate (direct, nuanced, educational, etc.)"
+}}
+
+Focus on:
+- Patterns across ALL posts, not individual posts
+- Overall consistency and brand voice
+- How they position themselves vs competitors
+- Unique linguistic patterns or phrases
+- Target audience sophistication level

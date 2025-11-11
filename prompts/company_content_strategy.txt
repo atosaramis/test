@@ -1,0 +1,41 @@
+Analyze this company's content strategy and distribution based on their LinkedIn posts.
+
+COMPANY: {company_name}
+POSTS ANALYZED: {num_posts}
+
+ALL POSTS TEXT:
+{all_posts_text}
+
+Return ONLY a valid JSON object (no markdown, no code blocks):
+{{
+  "content_pillar_distribution": {{
+    "thought_leadership": 45,
+    "product_updates": 30,
+    "company_culture": 15,
+    "industry_news": 5,
+    "educational_content": 5
+  }},
+  "primary_focus": "What they talk about most",
+  "content_themes": ["AI safety", "research", "product launches", "team culture"],
+  "topic_clusters": [
+    {{"theme": "AI Safety", "percentage": 30, "description": "Focus on alignment and safety research"}},
+    {{"theme": "Product Innovation", "percentage": 25, "description": "New features and capabilities"}}
+  ],
+  "content_formats": {{
+    "text_only": 60,
+    "with_images": 30,
+    "with_video": 10
+  }},
+  "post_length_pattern": "short|medium|long|mixed",
+  "hashtag_strategy": "Describe their hashtag usage patterns",
+  "cta_patterns": "How often they use calls-to-action and what types",
+  "content_gaps": ["Areas they could explore more"],
+  "strategic_positioning": "How they position themselves in the market through content"
+}}
+
+Analyze:
+- What % of content falls into each category
+- Main themes and topics
+- Content format preferences
+- Strategic patterns (what are they trying to achieve?)
+- What's missing that competitors might do

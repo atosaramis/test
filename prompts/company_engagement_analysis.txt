@@ -1,0 +1,45 @@
+Analyze engagement patterns and what content performs best for this company.
+
+COMPANY: {company_name}
+POSTS ANALYZED: {num_posts}
+
+POSTS WITH ENGAGEMENT DATA:
+{posts_with_metrics}
+
+Return ONLY a valid JSON object (no markdown, no code blocks):
+{{
+  "avg_engagement": {{
+    "likes": 1234,
+    "comments": 45,
+    "reposts": 12,
+    "total": 1291
+  }},
+  "engagement_rate": "Estimated engagement rate if calculable",
+  "top_performing_content_types": [
+    {{"type": "Technical deep-dives", "avg_engagement": 2500, "why_it_works": "Audience loves detailed technical content"}},
+    {{"type": "Research announcements", "avg_engagement": 2100, "why_it_works": "Novel insights resonate"}}
+  ],
+  "best_posting_times": "Based on post dates (if patterns visible)",
+  "posting_frequency": "X posts per week on average",
+  "engagement_triggers": [
+    "Specific patterns that drive engagement: questions, data, visuals, etc."
+  ],
+  "high_performing_hooks": [
+    "Examples of opening lines that worked well"
+  ],
+  "underperforming_patterns": [
+    "What doesn't work well"
+  ],
+  "optimal_post_structure": "Description of structure that performs best",
+  "content_length_sweet_spot": "Optimal length based on performance",
+  "strategic_recommendations": [
+    "Specific, actionable advice to improve engagement"
+  ]
+}}
+
+Focus on:
+- What types of content get the most engagement
+- Patterns in high-performers vs low-performers
+- Timing and frequency insights
+- Specific tactics that work (questions, data, stories, etc.)
+- Actionable recommendations to improve

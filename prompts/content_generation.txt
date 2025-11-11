@@ -1,0 +1,40 @@
+Generate a LinkedIn post in this company's voice and style.
+
+COMPANY VOICE PROFILE:
+{voice_profile}
+
+CONTENT STRATEGY:
+{content_strategy}
+
+USER INPUT:
+Type: {input_type}
+Content: {user_input}
+
+INSTRUCTIONS:
+Based on the company's voice profile and content strategy, generate a LinkedIn post that:
+1. Matches their tone, style, and personality
+2. Follows their typical post structure and length
+3. Uses their communication approach
+4. Fits their content strategy
+
+Return ONLY a valid JSON object (no markdown, no code blocks):
+{{
+  "post_text": "The full LinkedIn post text here, formatted with line breaks where appropriate",
+  "hook_explanation": "Why this opening works for their audience",
+  "voice_match_notes": "How this matches their voice characteristics",
+  "alternative_hooks": [
+    "Alternative opening line 1",
+    "Alternative opening line 2",
+    "Alternative opening line 3"
+  ],
+  "suggested_cta": "Optional call-to-action if appropriate",
+  "hashtag_suggestions": ["#hashtag1", "#hashtag2"]
+}}
+
+Guidelines:
+- Match their formality level exactly
+- Use their typical personality traits
+- Follow their content format preferences
+- Aim for their typical post length
+- Include their communication style (data-driven, storytelling, etc.)
+- Make it authentic to their brand
