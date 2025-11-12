@@ -361,7 +361,7 @@ def render_linkedin_app():
                         st.markdown("#### 🔄 Retry Failed Analyses")
                         st.caption("Re-run only the analyses that failed without re-fetching LinkedIn posts")
 
-                        if st.button("🔄 Retry Failed Analyses", key=f"retry_{client.get('id')}", use_container_width=True, type="primary"):
+                        if st.button("🔄 Retry Failed Analyses", key=f"retry_{hash(company_url)}", use_container_width=True, type="primary"):
                             retry_status = st.empty()
                             retry_status.info("Starting retry...")
 
@@ -429,7 +429,7 @@ def render_linkedin_app():
                     # Other action buttons
                     btn_col1, btn_col2 = st.columns(2)
                     with btn_col1:
-                        if st.button("🗑️ Delete Client", key=f"delete_{client.get('id')}", use_container_width=True, type="secondary"):
+                        if st.button("🗑️ Delete Client", key=f"delete_{hash(company_url)}", use_container_width=True, type="secondary"):
                             if delete_company_analysis(company_url):
                                 st.success(f"Deleted {company_name}")
                                 time.sleep(1)
@@ -437,12 +437,13 @@ def render_linkedin_app():
                             else:
                                 st.error("Failed to delete client")
                     with btn_col2:
-                        if st.button("📥 Download JSON", key=f"download_{client.get('id')}", use_container_width=True):
+                        if st.button("📥 Download JSON", key=f"download_btn_{hash(company_url)}", use_container_width=True):
                             st.download_button(
                                 label="Download",
                                 data=str(client),
                                 file_name=f"{company_name}_analysis.json",
-                                mime="application/json"
+                                mime="application/json",
+                                key=f"download_data_{hash(company_url)}"
                             )
 
                     st.divider()
@@ -613,7 +614,7 @@ def render_linkedin_app():
                         data=json.dumps(client, indent=2),
                         file_name=f"client_{company_name.replace(' ', '_')}.json",
                         mime="application/json",
-                        key=f"download_{client.get('id')}"
+                        key=f"download_client_{hash(company_url)}"
                     )
 
     # ============================================================================
