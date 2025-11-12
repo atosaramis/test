@@ -63,7 +63,12 @@ def chat_with_collection(
 
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=120, stream=stream)
-        response.raise_for_status()
+
+        # Check for HTTP errors
+        if response.status_code != 200:
+            error_text = response.text
+            yield {"error": f"API Error {response.status_code}: {error_text}"}
+            return
 
         if stream:
             for line in response.iter_lines():
@@ -76,13 +81,19 @@ def chat_with_collection(
                         try:
                             chunk = json.loads(data)
                             yield chunk
-                        except json.JSONDecodeError:
+                        except json.JSONDecodeError as e:
+                            # Yield parsing error for debugging
+                            yield {"error": f"JSON parse error: {str(e)}, data: {data[:100]}"}
                             continue
         else:
             yield response.json()
 
+    except requests.exceptions.Timeout:
+        yield {"error": "Request timed out after 120 seconds"}
     except requests.exceptions.RequestException as e:
-        yield {"error": f"Chat failed: {str(e)}"}
+        yield {"error": f"Request failed: {str(e)}"}
+    except Exception as e:
+        yield {"error": f"Unexpected error: {str(e)}"}
 
 
 def render_grok_chat_app():
@@ -93,10 +104,28 @@ def render_grok_chat_app():
 
     # Get collection ID from secrets
     collection_id = get_credential("SAMBA_COLLECTION_ID")
+    api_key = get_credential("XAI_API_KEY")
+
+    # Debug info in sidebar
+    with st.sidebar:
+        st.markdown("### Debug Info")
+        if api_key:
+            st.success(f"✅ API Key: {api_key[:10]}...{api_key[-5:]}")
+        else:
+            st.error("❌ No API Key")
+
+        if collection_id:
+            st.success(f"✅ Collection: {collection_id[:8]}...")
+        else:
+            st.error("❌ No Collection ID")
 
     if not collection_id:
         st.error("❌ SAMBA_COLLECTION_ID not configured in secrets.toml")
         st.info("💡 Add your Samba Scientific collection ID to secrets.toml:\n\n`SAMBA_COLLECTION_ID = \"your_collection_id\"`")
+        return
+
+    if not api_key:
+        st.error("❌ XAI_API_KEY not configured in secrets.toml")
         return
 
     # Initialize chat history
@@ -141,12 +170,19 @@ def render_grok_chat_app():
         # Stream response
         with st.chat_message("assistant"):
             response_placeholder = st.empty()
+            debug_placeholder = st.empty()
             full_response = ""
             citations = []
+            has_error = False
 
+            chunk_count = 0
             for chunk in chat_with_collection([collection_id], api_messages, stream=True):
+                chunk_count += 1
+                debug_placeholder.caption(f"Processing chunk {chunk_count}...")
+
                 if chunk.get("error"):
                     st.error(f"❌ {chunk['error']}")
+                    has_error = True
                     break
 
                 if "choices" in chunk:
@@ -161,23 +197,30 @@ def render_grok_chat_app():
                 if "citations" in chunk:
                     citations = chunk["citations"]
 
-            # Final response
-            response_placeholder.markdown(full_response)
+            debug_placeholder.empty()
 
-            # Show citations
-            if citations:
-                with st.expander("📎 Sources"):
-                    for i, citation in enumerate(citations, 1):
-                        st.caption(f"{i}. {citation}")
+            if not has_error:
+                # Final response
+                if full_response:
+                    response_placeholder.markdown(full_response)
+                else:
+                    response_placeholder.warning("⚠️ No response generated. Grok may still be processing or there was an issue.")
 
-        # Add assistant message to history
-        st.session_state.grok_messages.append({
-            "role": "assistant",
-            "content": full_response,
-            "citations": citations
-        })
+                # Show citations
+                if citations:
+                    with st.expander("📎 Sources"):
+                        for i, citation in enumerate(citations, 1):
+                            st.caption(f"{i}. {citation}")
 
-        st.rerun()
+        # Add assistant message to history (only if we got a response)
+        if not has_error and full_response:
+            st.session_state.grok_messages.append({
+                "role": "assistant",
+                "content": full_response,
+                "citations": citations
+            })
+
+            st.rerun()
 
     # Clear chat button in sidebar
     with st.sidebar:
