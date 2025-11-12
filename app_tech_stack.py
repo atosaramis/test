@@ -136,60 +136,88 @@ def render_tech_stack_app():
 
                 # Display summary
                 st.markdown("---")
-                st.markdown(f"### 📊 Results for **{tech_data.get('target', domain)}**")
+                st.markdown(f"### 📊 Results for **{tech_data.get('domain', domain)}**")
+
+                # Extract technologies from nested structure
+                technologies = tech_data.get("technologies", {})
+
+                # Count total technologies
+                total_count = 0
+                tech_list = []
+                tech_by_category = {}
+
+                for main_category, subcategories in technologies.items():
+                    if isinstance(subcategories, dict):
+                        for subcategory, tech_array in subcategories.items():
+                            if isinstance(tech_array, list):
+                                total_count += len(tech_array)
+
+                                # Format category name
+                                category_display = main_category.replace("_", " ").title()
+                                subcategory_display = subcategory.replace("_", " ").title()
+
+                                # Add to flat list for export
+                                for tech_name in tech_array:
+                                    tech_list.append({
+                                        "Technology": tech_name,
+                                        "Category": category_display,
+                                        "Subcategory": subcategory_display
+                                    })
+
+                                # Group for display
+                                if category_display not in tech_by_category:
+                                    tech_by_category[category_display] = {}
+                                if subcategory_display not in tech_by_category[category_display]:
+                                    tech_by_category[category_display][subcategory_display] = []
+                                tech_by_category[category_display][subcategory_display].extend(tech_array)
 
                 # Metrics
-                total_count = tech_data.get("total_count", 0)
-                items_count = tech_data.get("items_count", 0)
-
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("Total Technologies", total_count)
                 with col2:
-                    st.metric("Displayed", items_count)
+                    st.metric("Domain Rank", tech_data.get("domain_rank", "N/A"))
                 with col3:
                     cost = task.get("cost", 0)
                     st.metric("API Cost", f"${cost:.4f}")
 
+                # Display additional info
+                if tech_data.get("title"):
+                    st.markdown(f"**Title:** {tech_data['title']}")
+                if tech_data.get("description"):
+                    with st.expander("📄 Site Description"):
+                        st.write(tech_data['description'])
+
+                # Contact information
+                col1, col2 = st.columns(2)
+                with col1:
+                    if tech_data.get("emails"):
+                        st.markdown("**📧 Emails:**")
+                        for email in tech_data["emails"]:
+                            st.write(f"- {email}")
+                with col2:
+                    if tech_data.get("phone_numbers"):
+                        st.markdown("**📞 Phone Numbers:**")
+                        for phone in tech_data["phone_numbers"]:
+                            st.write(f"- {phone}")
+
+                # Social media
+                if tech_data.get("social_graph_urls"):
+                    with st.expander("🔗 Social Media Links"):
+                        for url in tech_data["social_graph_urls"]:
+                            st.markdown(f"- {url}")
+
                 # Display technologies
-                if tech_data.get("items"):
+                if tech_by_category:
                     st.markdown("### 🛠️ Technologies Detected")
 
-                    # Group technologies by category
-                    tech_by_category = {}
-                    tech_list = []
-
-                    for item in tech_data["items"]:
-                        tech_name = item.get("technology", "Unknown")
-                        categories = item.get("categories", [])
-                        groups = item.get("groups", [])
-
-                        # Add to flat list for export
-                        tech_list.append({
-                            "Technology": tech_name,
-                            "Categories": ", ".join(categories) if categories else "N/A",
-                            "Groups": ", ".join(groups) if groups else "N/A"
-                        })
-
-                        # Group by first category
-                        category = categories[0] if categories else "Other"
-                        if category not in tech_by_category:
-                            tech_by_category[category] = []
-                        tech_by_category[category].append({
-                            "name": tech_name,
-                            "groups": groups
-                        })
-
                     # Display by category
-                    for category, technologies in sorted(tech_by_category.items()):
-                        with st.expander(f"**{category}** ({len(technologies)} technologies)", expanded=True):
-                            for tech in technologies:
-                                tech_name = tech["name"]
-                                groups = tech.get("groups", [])
-                                if groups:
-                                    st.markdown(f"- **{tech_name}** ({', '.join(groups)})")
-                                else:
-                                    st.markdown(f"- **{tech_name}**")
+                    for category, subcategories in sorted(tech_by_category.items()):
+                        with st.expander(f"**{category}**", expanded=True):
+                            for subcategory, technologies in sorted(subcategories.items()):
+                                st.markdown(f"**{subcategory}:**")
+                                for tech_name in technologies:
+                                    st.markdown(f"- {tech_name}")
 
                     # Export functionality
                     st.markdown("---")
@@ -211,10 +239,14 @@ def render_tech_stack_app():
                         st.json(tech_data)
 
                 else:
-                    st.warning("⚠️ No technologies detected for this domain.")
+                    st.info("ℹ️ No technologies detected for this domain.")
 
             else:
-                st.warning("⚠️ No data returned for this domain.")
+                st.info("ℹ️ No technology data returned for this domain.")
+                st.markdown("This could mean:")
+                st.markdown("- The domain is very new or has minimal web presence")
+                st.markdown("- The site uses custom or proprietary technologies")
+                st.markdown("- The domain redirects to a different URL")
 
         elif result:
             st.error("❌ Failed to retrieve technology data.")
