@@ -49,7 +49,7 @@ def render_linkedin_app():
     # ============================================================================
     with tab1:
         st.markdown("### Onboard a New Client")
-        st.caption("Add client LinkedIn profile to analyze their voice, strategy, and content performance")
+        st.caption("Analyze LinkedIn presence and generate content in their voice")
 
         st.markdown("**Client LinkedIn URL**")
         client_linkedin_url = st.text_input(
@@ -59,7 +59,7 @@ def render_linkedin_app():
             label_visibility="collapsed"
         )
 
-        st.info("**What will be analyzed:**\n- 50 recent LinkedIn posts\n- Voice & tone profile\n- Content strategy & pillars\n- Engagement patterns\n- All data saved to client profile")
+        st.info("**What happens:**\n- Scrapes 50 recent LinkedIn posts\n- Analyzes voice, tone, and writing style\n- Identifies content strategy and themes\n- Calculates engagement metrics\n- Saves data for content generation")
 
         onboard_button = st.button("🚀 Onboard Client", type="primary", use_container_width=True)
 
