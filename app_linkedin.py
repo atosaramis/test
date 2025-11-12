@@ -23,11 +23,7 @@ from seo_functions import (
     get_company_analysis,
     get_all_company_analyses,
     delete_company_analysis,
-    save_generated_posts,
-    get_ranked_keywords_for_domain,
-    query_llm_about_company,
-    update_company_ranked_keywords,
-    update_company_ai_perception
+    save_generated_posts
 )
 from ai_analysis import analyze_company_complete, generate_content
 import pandas as pd
@@ -53,7 +49,7 @@ def render_linkedin_app():
     # ============================================================================
     with tab1:
         st.markdown("### Onboard a New Client")
-        st.caption("Add client LinkedIn profile and website to start comprehensive analysis")
+        st.caption("Add client LinkedIn profile to analyze their voice, strategy, and content performance")
 
         st.markdown("**Client LinkedIn URL**")
         client_linkedin_url = st.text_input(
@@ -63,15 +59,7 @@ def render_linkedin_app():
             label_visibility="collapsed"
         )
 
-        st.markdown("**Client Website Domain**")
-        client_domain = st.text_input(
-            "Domain",
-            placeholder="anthropic.com",
-            help="Enter the domain without https:// (e.g., anthropic.com)",
-            label_visibility="collapsed"
-        )
-
-        st.info("**What will be analyzed:**\n- 50 recent LinkedIn posts\n- Voice & content strategy\n- 500 organic keyword rankings\n- AI perception analysis (3 default questions)\n- All data saved to client profile")
+        st.info("**What will be analyzed:**\n- 50 recent LinkedIn posts\n- Voice & tone profile\n- Content strategy & pillars\n- Engagement patterns\n- All data saved to client profile")
 
         onboard_button = st.button("🚀 Onboard Client", type="primary", use_container_width=True)
 
@@ -79,11 +67,8 @@ def render_linkedin_app():
         if onboard_button:
             if not client_linkedin_url.strip():
                 st.error("Please enter client LinkedIn URL")
-            elif not client_domain.strip():
-                st.error("Please enter client website domain")
             else:
                 linkedin_url = client_linkedin_url.strip()
-                domain = client_domain.strip()
 
                 # Extract company name
                 company_name = linkedin_url.split('/')[-2] if '/' in linkedin_url else "Unknown Client"
@@ -97,9 +82,7 @@ def render_linkedin_app():
                     "posts": {"status": "pending", "data": None, "error": None},
                     "voice": {"status": "pending", "data": None, "error": None},
                     "strategy": {"status": "pending", "data": None, "error": None},
-                    "engagement": {"status": "pending", "data": None, "error": None},
-                    "keywords": {"status": "pending", "data": None, "error": None},
-                    "ai_perception": {"status": "pending", "data": None, "error": None}
+                    "engagement": {"status": "pending", "data": None, "error": None}
                 }
 
                 # Step 1: Fetch LinkedIn posts
@@ -166,57 +149,6 @@ def render_linkedin_app():
                     else:
                         status_analysis.error(f"❌ **AI analysis failed** (all 3 analyses failed)")
 
-                    # Step 3: Fetch ranked keywords
-                    status_keywords = st.empty()
-                    status_keywords.info(f"🔍 **Fetching ranked keywords for {domain}...**")
-
-                    ranked_keywords_result = get_ranked_keywords_for_domain(
-                        domain=domain,
-                        limit=keyword_limit_default,
-                        include_paid=include_paid_default,
-                        max_position=max_position_default
-                    )
-
-                    if not ranked_keywords_result.get('error'):
-                        update_company_ranked_keywords(
-                            company_url=linkedin_url,
-                            ranked_keywords_data=ranked_keywords_result,
-                            domain=domain
-                        )
-                        results["keywords"]["status"] = "success"
-                        results["keywords"]["data"] = ranked_keywords_result
-                        kw_count = ranked_keywords_result.get('count', 0)
-                        status_keywords.success(f"✅ **Found {kw_count} ranked keywords**")
-                    else:
-                        results["keywords"]["status"] = "failed"
-                        results["keywords"]["error"] = ranked_keywords_result.get('error')
-                        status_keywords.error(f"❌ **Keyword fetch failed**: {ranked_keywords_result.get('error')}")
-
-                    # Step 4: Query AI perception
-                    status_ai = st.empty()
-                    status_ai.info(f"🔮 **Querying AI about {company_name}...**")
-
-                    ai_perception_result = query_llm_about_company(
-                        company_name=company_name,
-                        domain=domain,
-                        llm_provider="chatgpt",
-                        custom_prompt=None
-                    )
-
-                    if not ai_perception_result.get('error'):
-                        update_company_ai_perception(
-                            company_url=linkedin_url,
-                            ai_perception_data=ai_perception_result
-                        )
-                        results["ai_perception"]["status"] = "success"
-                        results["ai_perception"]["data"] = ai_perception_result
-                        ai_count = len(ai_perception_result.get('responses', []))
-                        status_ai.success(f"✅ **AI perception complete** ({ai_count} queries)")
-                    else:
-                        results["ai_perception"]["status"] = "failed"
-                        results["ai_perception"]["error"] = ai_perception_result.get('error')
-                        status_ai.error(f"❌ **AI perception failed**: {ai_perception_result.get('error')}")
-
                     # Summary
                     st.markdown("---")
                     st.markdown("### 📊 Onboarding Summary")
@@ -280,16 +212,12 @@ def render_linkedin_app():
                 voice_profile = client.get('voice_profile', {})
                 content_pillars = client.get('content_pillars', {})
                 engagement_metrics = client.get('engagement_metrics', {})
-                ranked_keywords = client.get('ranked_keywords', {})
-                ai_perception = client.get('ai_perception', {})
 
                 data_checks = {
                     "Posts": posts_analyzed > 0,
                     "Voice": bool(voice_profile and not voice_profile.get('error')),
                     "Strategy": bool(content_pillars and not content_pillars.get('error')),
-                    "Engagement": bool(engagement_metrics and not engagement_metrics.get('error')),
-                    "Keywords": bool(ranked_keywords and not ranked_keywords.get('error')),
-                    "AI Perception": bool(ai_perception and not ai_perception.get('error'))
+                    "Engagement": bool(engagement_metrics and not engagement_metrics.get('error'))
                 }
 
                 complete_count = sum(1 for v in data_checks.values() if v)
@@ -337,21 +265,17 @@ def render_linkedin_app():
 
                     st.divider()
                     # Quick metrics
-                    col1, col2, col3, col4 = st.columns(4)
+                    col1, col2, col3 = st.columns(3)
                     with col1:
                         st.metric("Posts", posts_analyzed)
                     with col2:
-                        ranked_kw = client.get('ranked_keywords', {})
-                        kw_count = ranked_kw.get('count', 0) if not ranked_kw.get('error') else 0
-                        st.metric("Keywords", kw_count)
-                    with col3:
                         engagement = client.get('engagement_metrics', {}).get('avg_engagement', {})
                         avg_eng = engagement.get('total', 0)
                         st.metric("Avg Engagement", f"{avg_eng:,}")
-                    with col4:
-                        ai_data = client.get('ai_perception', {})
-                        ai_count = len(ai_data.get('responses', [])) if not ai_data.get('error') else 0
-                        st.metric("AI Queries", ai_count)
+                    with col3:
+                        voice = client.get('voice_profile', {})
+                        consistency = voice.get('consistency_score', 0) if voice and not voice.get('error') else 0
+                        st.metric("Voice Consistency", f"{consistency}/10")
 
                     st.divider()
 
@@ -398,28 +322,6 @@ def render_linkedin_app():
                                 else:
                                     retry_status.error(f"❌ Engagement still failing: {engagement_result.get('error')}")
 
-                            # Retry Keywords if failed
-                            if not data_checks["Keywords"]:
-                                retry_status.info("🔄 Retrying keyword fetch...")
-                                domain = client.get('domain', '')
-                                if domain:
-                                    kw_result = get_ranked_keywords_for_domain(domain, limit=keyword_limit_default)
-                                    if not kw_result.get('error'):
-                                        update_company_ranked_keywords(company_url, kw_result, domain)
-                                        retry_status.success("✅ Keyword fetch succeeded!")
-                                    else:
-                                        retry_status.error(f"❌ Keywords still failing: {kw_result.get('error')}")
-
-                            # Retry AI Perception if failed
-                            if not data_checks["AI Perception"]:
-                                retry_status.info("🔄 Retrying AI perception...")
-                                ai_result = query_llm_about_company(company_name, client.get('domain', ''), "chatgpt")
-                                if not ai_result.get('error'):
-                                    update_company_ai_perception(company_url, ai_result)
-                                    retry_status.success("✅ AI perception succeeded!")
-                                else:
-                                    retry_status.error(f"❌ AI perception still failing: {ai_result.get('error')}")
-
                             retry_status.success("🎉 Retry complete! Refreshing page...")
                             time.sleep(2)
                             st.rerun()
@@ -448,29 +350,25 @@ def render_linkedin_app():
 
                     st.divider()
 
-                    # Display consolidated 5-tab analysis
-                    client_tabs = st.tabs(["📊 Overview", "🎤 Voice & Strategy", "📈 Content Performance", "🔍 Keywords & AI", "🐛 Debug"])
+                    # Display consolidated 4-tab analysis
+                    client_tabs = st.tabs(["📊 Overview", "🎤 Voice & Strategy", "📈 Content Performance", "📥 Export Data"])
 
                     # Tab 0: Overview
                     with client_tabs[0]:
                         st.markdown("### 📊 Quick Overview")
 
                         # Summary metrics row
-                        m1, m2, m3, m4 = st.columns(4)
+                        m1, m2, m3 = st.columns(3)
                         with m1:
                             st.metric("Posts Analyzed", posts_analyzed)
                         with m2:
-                            ranked_kw = client.get('ranked_keywords', {})
-                            kw_count = ranked_kw.get('count', 0) if not ranked_kw.get('error') else 0
-                            st.metric("Keywords", kw_count)
-                        with m3:
                             engagement = client.get('engagement_metrics', {}).get('avg_engagement', {})
                             avg_eng = engagement.get('total', 0)
                             st.metric("Avg Engagement", f"{avg_eng:,}")
-                        with m4:
-                            ai_data = client.get('ai_perception', {})
-                            ai_count = len(ai_data.get('responses', [])) if not ai_data.get('error') else 0
-                            st.metric("AI Queries", ai_count)
+                        with m3:
+                            voice = client.get('voice_profile', {})
+                            consistency = voice.get('consistency_score', 0) if voice and not voice.get('error') else 0
+                            st.metric("Voice Consistency", f"{consistency}/10")
 
                         st.divider()
 
@@ -566,46 +464,10 @@ def render_linkedin_app():
                         else:
                             st.info("No top posts data")
 
-                    # Tab 3: Keywords & AI (Combined)
+                    # Tab 3: Export Data
                     with client_tabs[3]:
-                        st.markdown("### 🔍 Ranked Keywords")
-                        ranked_kw = client.get('ranked_keywords', {})
-                        if ranked_kw and not ranked_kw.get('error'):
-                            keywords = ranked_kw.get('keywords', [])[:20]
-                            if keywords:
-                                df = pd.DataFrame(keywords)
-                                df = df[['keyword', 'position', 'search_volume']]
-                                st.dataframe(df, use_container_width=True)
-                            else:
-                                st.info("Keywords fetched but no data returned")
-                        elif ranked_kw.get('error'):
-                            st.error(f"Keyword fetch failed: {ranked_kw.get('error')}")
-                            st.caption("💡 This usually means the DataForSEO API call failed. Check your API key and credits.")
-                        else:
-                            st.info("No keyword data available - may not have been fetched during onboarding")
-
-                        st.divider()
-
-                        st.markdown("### 🔮 AI Perception")
-                        ai_data = client.get('ai_perception', {})
-                        if ai_data and not ai_data.get('error'):
-                            responses = ai_data.get('responses', [])
-                            if responses:
-                                for i, resp in enumerate(responses, 1):
-                                    with st.expander(f"Q{i}: {resp.get('prompt', '')[:80]}..."):
-                                        st.write(f"**Answer:** {resp.get('response', '')}")
-                            else:
-                                st.info("AI perception fetched but no responses returned")
-                        elif ai_data.get('error'):
-                            st.error(f"AI perception query failed: {ai_data.get('error')}")
-                            st.caption("💡 This usually means the ChatGPT API call failed. Check your API configuration.")
-                        else:
-                            st.info("No AI perception data available - may not have been fetched during onboarding")
-
-                    # Tab 4: Debug
-                    with client_tabs[4]:
-                        st.markdown("### 🐛 Raw Client Data")
-                        st.caption("Debug view - shows all data from database. Use this to diagnose issues.")
+                        st.markdown("### 📥 Complete Client Data")
+                        st.caption("Full dataset from database - download as JSON for external analysis")
                         st.json(client)
 
                     # Download button
