@@ -825,9 +825,7 @@ def save_company_analysis(analysis_dict: Dict) -> bool:
             'voice_profile': json.dumps(analysis_dict.get('voice_profile', {})),
             'content_pillars': json.dumps(analysis_dict.get('content_pillars', {})),
             'engagement_metrics': json.dumps(analysis_dict.get('engagement_metrics', {})),
-            'posting_strategy': json.dumps(analysis_dict.get('posting_strategy', {})),
             'top_posts': json.dumps(analysis_dict.get('top_posts', [])),
-            'strategic_recommendations': json.dumps(analysis_dict.get('strategic_recommendations', {})),
             'posts_analyzed': analysis_dict.get('posts_analyzed'),
             'date_range': analysis_dict.get('date_range'),
             'analysis_model': analysis_dict.get('analysis_model')
