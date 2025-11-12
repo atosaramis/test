@@ -241,7 +241,11 @@ def read_file_from_container(file_path: str, container_id: str, model: str = "cl
             if block.type == 'bash_code_execution_tool_result':
                 if hasattr(block, 'content'):
                     content = block.content
-                    if isinstance(content, dict):
+                    # Content is a BetaBashCodeExecutionResultBlock object with stdout
+                    if hasattr(content, 'stdout'):
+                        return content.stdout
+                    # Fallback for dict structure
+                    elif isinstance(content, dict):
                         result = content.get('content', [])
                         if isinstance(result, list):
                             for item in result:
