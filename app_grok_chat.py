@@ -52,8 +52,8 @@ def chat_with_collection(
         "stream": stream,
         "tools": [
             {
-                "type": "collections_search",
-                "collections_search": {
+                "type": "file_search",
+                "file_search": {
                     "collection_ids": collection_ids,
                     "limit": 6
                 }
