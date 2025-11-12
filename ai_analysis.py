@@ -156,9 +156,19 @@ def parse_json_response(response_dict: Dict) -> Dict:
     response_text = response_text.strip()
 
     try:
+        # Try regular JSON parsing first
         return json.loads(response_text)
     except json.JSONDecodeError as e:
-        return {"error": f"Failed to parse JSON: {str(e)}. Response: {response_text[:500]}"}
+        # If there's "Extra data" error, try to extract just the first JSON object
+        if "Extra data" in str(e):
+            try:
+                decoder = json.JSONDecoder()
+                obj, idx = decoder.raw_decode(response_text)
+                return obj
+            except json.JSONDecodeError:
+                return {"error": f"Failed to parse JSON: {str(e)}. Response: {response_text[:500]}"}
+        else:
+            return {"error": f"Failed to parse JSON: {str(e)}. Response: {response_text[:500]}"}
 
 
 def analyze_company_voice(
