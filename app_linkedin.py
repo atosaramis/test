@@ -277,16 +277,22 @@ def render_linkedin_app():
                 updated_at = client.get('updated_at', '')[:10] if client.get('updated_at') else 'N/A'
 
                 # Calculate health status
+                voice_profile = client.get('voice_profile', {})
+                content_pillars = client.get('content_pillars', {})
+                engagement_metrics = client.get('engagement_metrics', {})
+                ranked_keywords = client.get('ranked_keywords', {})
+                ai_perception = client.get('ai_perception', {})
+
                 data_checks = {
                     "Posts": posts_analyzed > 0,
-                    "Voice": client.get('voice_profile', {}) and not client.get('voice_profile', {}).get('error'),
-                    "Strategy": client.get('content_pillars', {}) and not client.get('content_pillars', {}).get('error'),
-                    "Engagement": client.get('engagement_metrics', {}) and not client.get('engagement_metrics', {}).get('error'),
-                    "Keywords": client.get('ranked_keywords', {}) and not client.get('ranked_keywords', {}).get('error'),
-                    "AI Perception": client.get('ai_perception', {}) and not client.get('ai_perception', {}).get('error')
+                    "Voice": bool(voice_profile and not voice_profile.get('error')),
+                    "Strategy": bool(content_pillars and not content_pillars.get('error')),
+                    "Engagement": bool(engagement_metrics and not engagement_metrics.get('error')),
+                    "Keywords": bool(ranked_keywords and not ranked_keywords.get('error')),
+                    "AI Perception": bool(ai_perception and not ai_perception.get('error'))
                 }
 
-                complete_count = sum(data_checks.values())
+                complete_count = sum(1 for v in data_checks.values() if v)
                 total_count = len(data_checks)
                 completion_pct = int((complete_count / total_count) * 100)
 
