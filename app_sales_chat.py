@@ -50,7 +50,7 @@ def chat_with_collection_sdk(collection_ids: List[str], user_message: str):
             ],
         )
 
-        chat.append(system("You are a helpful assistant with access to Samba Scientific's sales menu and services. Answer questions accurately based on the retrieved documents."))
+        chat.append(system("You are a helpful assistant with access to Samba Scientific's sales menu and services. Answer questions accurately based on the retrieved documents. Format your responses using clean markdown: use **bold** for emphasis, bullet points for lists, and clear paragraph breaks. Avoid using special characters, LaTeX notation, or complex formatting."))
         chat.append(user(user_message))
 
         # Stream the response
