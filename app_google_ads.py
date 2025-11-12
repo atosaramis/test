@@ -255,6 +255,11 @@ def render_google_ads_app():
                         first_shown = item.get("first_shown", "N/A")
                         last_shown = item.get("last_shown", "N/A")
 
+                        # DEBUG: Show first ad's full structure
+                        if idx == 0:
+                            st.json(item)
+                            st.write("Available keys:", list(item.keys()))
+
                         # Extract preview image URL
                         preview_image_obj = item.get("preview_image", {})
                         preview_image_url = preview_image_obj.get("url") if preview_image_obj else None
