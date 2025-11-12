@@ -150,17 +150,15 @@ def render_google_ads_app():
                 st.markdown(f"## 📊 {ads_data.get('target', domain)}")
 
                 # Metrics
-                total_count = ads_data.get("total_count", 0)
-                items_count = ads_data.get("items_count", 0)
+                items = ads_data.get("items", [])
+                items_count = len(items)
 
-                col1, col2, col3, col4 = st.columns(4)
+                col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Total Ads", total_count)
+                    st.metric("Total Ads Found", items_count)
                 with col2:
-                    st.metric("Showing", items_count)
-                with col3:
                     st.metric("Location", location_name)
-                with col4:
+                with col3:
                     cost = task.get("cost", 0)
                     st.metric("API Cost", f"${cost:.4f}")
 
@@ -180,9 +178,14 @@ def render_google_ads_app():
                         url = item.get("url", "")
                         verified = item.get("verified", False)
                         ad_format = item.get("format", "text")
-                        preview_image = item.get("preview_image", None)
+                        preview_image_obj = item.get("preview_image", None)
                         first_shown = item.get("first_shown", "N/A")
                         last_shown = item.get("last_shown", "N/A")
+
+                        # Extract preview image URL if available
+                        preview_image_url = None
+                        if preview_image_obj and isinstance(preview_image_obj, dict):
+                            preview_image_url = preview_image_obj.get("url")
 
                         ads_list.append({
                             "Title": title,
@@ -193,31 +196,31 @@ def render_google_ads_app():
                             "Last Shown": last_shown,
                             "Advertiser ID": advertiser_id,
                             "Creative ID": creative_id,
-                            "Preview Image": preview_image
+                            "Preview Image URL": preview_image_url or ""
                         })
 
                         # Display individual ad card
                         with st.container():
-                            st.markdown(f"**{title}**")
-
-                            col_a, col_b, col_c = st.columns([2, 1, 1])
-                            with col_a:
-                                if url:
-                                    st.markdown(f"🔗 [{url}]({url})")
-                            with col_b:
-                                st.caption(f"Format: {ad_format}")
-                            with col_c:
+                            col_header1, col_header2 = st.columns([3, 1])
+                            with col_header1:
+                                st.markdown(f"### {title}")
+                            with col_header2:
                                 if verified:
-                                    st.caption("✓ Verified")
+                                    st.markdown("✅ **Verified**")
 
-                            if preview_image:
-                                st.image(preview_image, use_column_width=True)
+                            # Preview image (if available)
+                            if preview_image_url:
+                                st.image(preview_image_url, use_column_width=True)
 
-                            col_d, col_e = st.columns(2)
-                            with col_d:
-                                st.caption(f"First shown: {first_shown}")
-                            with col_e:
-                                st.caption(f"Last shown: {last_shown}")
+                            # Ad details
+                            col_a, col_b = st.columns(2)
+                            with col_a:
+                                st.markdown(f"**Format:** {ad_format}")
+                                st.markdown(f"**First shown:** {first_shown}")
+                            with col_b:
+                                st.markdown(f"**Last shown:** {last_shown}")
+                                if url:
+                                    st.markdown(f"[View on Ads Transparency]({url})")
 
                             st.markdown("---")
 
