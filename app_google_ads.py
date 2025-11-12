@@ -168,6 +168,11 @@ def render_google_ads_app():
                 if ads_data.get("items"):
                     st.markdown("### 📢 Google Ads Creatives")
 
+                    # TEMPORARY DEBUG - show first item structure
+                    if len(ads_data["items"]) > 0:
+                        st.info("🐛 DEBUG: First Ad Item Structure")
+                        st.json(ads_data["items"][0])
+
                     # Prepare data for display and export
                     ads_list = []
 
