@@ -7,7 +7,10 @@ import streamlit as st
 import os
 import requests
 import time
+import subprocess
+import tempfile
 from typing import Optional, Dict
+from pathlib import Path
 
 
 def get_credential(key: str, default=None):
@@ -16,6 +19,67 @@ def get_credential(key: str, default=None):
         return st.secrets.get(key, os.environ.get(key, default))
     except (FileNotFoundError, KeyError):
         return os.environ.get(key, default)
+
+
+def extract_audio_from_video(video_path: str, output_path: str) -> bool:
+    """
+    Extract audio from video file using ffmpeg.
+
+    Args:
+        video_path: Path to input video file
+        output_path: Path to output audio file (mp3)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Check if ffmpeg is available
+        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
+
+        # Extract audio to mp3
+        cmd = [
+            "ffmpeg",
+            "-i", video_path,
+            "-vn",  # No video
+            "-acodec", "libmp3lame",  # MP3 codec
+            "-b:a", "128k",  # Bitrate
+            "-ar", "44100",  # Sample rate
+            "-y",  # Overwrite output file
+            output_path
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.returncode == 0
+
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+def upload_file_to_assemblyai(file_data: bytes, api_key: str) -> Optional[str]:
+    """
+    Upload file to AssemblyAI and get upload URL.
+
+    Args:
+        file_data: File bytes
+        api_key: AssemblyAI API key
+
+    Returns:
+        Upload URL or None if failed
+    """
+    url = "https://api.assemblyai.com/v2/upload"
+
+    headers = {
+        "Authorization": api_key
+    }
+
+    try:
+        response = requests.post(url, headers=headers, data=file_data, timeout=300)
+        response.raise_for_status()
+        result = response.json()
+        return result.get("upload_url")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Upload failed: {str(e)}")
+        return None
 
 
 def submit_transcription(audio_url: str, api_key: str, options: Dict) -> Optional[Dict]:
@@ -99,13 +163,25 @@ def render_transcription_app():
 
     tab1, tab2 = st.tabs(["📤 Upload File", "🔗 Audio URL"])
 
+    uploaded_file = None
+    audio_url = None
+
     with tab1:
-        st.info("File upload feature coming soon. Please use Audio URL for now.")
+        st.caption("Supports audio and video files. Video files will be automatically converted to audio.")
+
         uploaded_file = st.file_uploader(
-            "Upload audio file",
-            type=["mp3", "wav", "m4a", "flac", "ogg"],
-            disabled=True
+            "Upload audio or video file",
+            type=["mp3", "wav", "m4a", "flac", "ogg", "mp4", "mov", "avi", "mkv", "webm"],
+            help="Max file size: 500MB. Video files will be converted to MP3."
         )
+
+        if uploaded_file:
+            file_size_mb = uploaded_file.size / (1024 * 1024)
+            st.info(f"📁 File: {uploaded_file.name} ({file_size_mb:.1f} MB)")
+
+            if file_size_mb > 500:
+                st.error("❌ File too large. Maximum size is 500MB.")
+                uploaded_file = None
 
     with tab2:
         audio_url = st.text_input(
@@ -147,8 +223,8 @@ def render_transcription_app():
 
     # Submit button
     if st.button("🎙️ Start Transcription", type="primary", use_container_width=True):
-        if not audio_url:
-            st.error("Please provide an audio URL")
+        if not uploaded_file and not audio_url:
+            st.error("Please upload a file or provide an audio URL")
         else:
             # Build options
             options = {
@@ -158,23 +234,80 @@ def render_transcription_app():
                 "entity_detection": entity_detection
             }
 
-            with st.spinner("Submitting audio for transcription..."):
-                result = submit_transcription(audio_url, api_key, options)
+            final_audio_url = audio_url
 
-                if result.get("error"):
-                    st.error(f"❌ {result['error']}")
-                elif result.get("id"):
-                    st.success(f"✅ Transcription started! ID: {result['id']}")
+            # Handle file upload
+            if uploaded_file:
+                file_extension = Path(uploaded_file.name).suffix.lower()
+                video_extensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm']
+                is_video = file_extension in video_extensions
 
-                    # Add to session state
-                    st.session_state.transcripts.insert(0, {
-                        "id": result["id"],
-                        "url": audio_url,
-                        "status": "queued",
-                        "options": options
-                    })
+                with st.spinner("Processing file..."):
+                    try:
+                        # Save uploaded file temporarily
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
+                            tmp_file.write(uploaded_file.read())
+                            tmp_path = tmp_file.name
 
-                    st.rerun()
+                        # If video, extract audio
+                        if is_video:
+                            st.info("🎬 Video file detected. Extracting audio to MP3...")
+                            audio_tmp_path = tmp_path.replace(file_extension, '.mp3')
+
+                            if extract_audio_from_video(tmp_path, audio_tmp_path):
+                                st.success("✅ Audio extracted successfully")
+                                os.remove(tmp_path)  # Remove original video
+                                tmp_path = audio_tmp_path
+
+                                # Show size reduction
+                                original_size = uploaded_file.size / (1024 * 1024)
+                                new_size = os.path.getsize(tmp_path) / (1024 * 1024)
+                                st.success(f"📉 Size reduced: {original_size:.1f}MB → {new_size:.1f}MB")
+                            else:
+                                st.error("❌ Failed to extract audio. Please install ffmpeg or use an audio file.")
+                                os.remove(tmp_path)
+                                st.stop()
+
+                        # Read file data
+                        with open(tmp_path, 'rb') as f:
+                            file_data = f.read()
+
+                        # Upload to AssemblyAI
+                        st.info("☁️ Uploading to AssemblyAI...")
+                        final_audio_url = upload_file_to_assemblyai(file_data, api_key)
+
+                        # Clean up temp file
+                        os.remove(tmp_path)
+
+                        if not final_audio_url:
+                            st.error("❌ Upload failed")
+                            st.stop()
+
+                        st.success(f"✅ Upload complete!")
+
+                    except Exception as e:
+                        st.error(f"❌ Error processing file: {str(e)}")
+                        st.stop()
+
+            # Submit transcription
+            if final_audio_url:
+                with st.spinner("Submitting for transcription..."):
+                    result = submit_transcription(final_audio_url, api_key, options)
+
+                    if result.get("error"):
+                        st.error(f"❌ {result['error']}")
+                    elif result.get("id"):
+                        st.success(f"✅ Transcription started! ID: {result['id']}")
+
+                        # Add to session state
+                        st.session_state.transcripts.insert(0, {
+                            "id": result["id"],
+                            "url": final_audio_url if not uploaded_file else f"Uploaded: {uploaded_file.name}",
+                            "status": "queued",
+                            "options": options
+                        })
+
+                        st.rerun()
 
     # Display transcripts
     if st.session_state.transcripts:
