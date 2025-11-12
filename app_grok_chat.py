@@ -122,10 +122,6 @@ def render_grok_chat_app():
         elif role == "assistant":
             with st.chat_message("assistant"):
                 st.markdown(content)
-                if message.get("citations"):
-                    with st.expander("📎 Sources"):
-                        for i, citation in enumerate(message["citations"], 1):
-                            st.caption(f"{i}. {citation}")
 
     # Chat input
     user_input = st.chat_input("Ask a question about Samba Scientific...")
@@ -140,33 +136,42 @@ def render_grok_chat_app():
         # Stream response using SDK
         with st.chat_message("assistant"):
             response_placeholder = st.empty()
+            spinner_placeholder = st.empty()
             full_response = ""
-            citations = []
             has_error = False
+            is_streaming = False
 
             for chunk in chat_with_collection_sdk([collection_id], user_input):
                 if chunk.get("error"):
+                    spinner_placeholder.empty()
                     st.error(f"❌ {chunk['error']}")
                     has_error = True
                     break
 
+                if chunk.get("status") == "streaming":
+                    # Show modern spinner while searching
+                    spinner_placeholder.markdown(
+                        '<div style="display: flex; align-items: center; gap: 10px;">'
+                        '<div class="stSpinner" style="width: 20px; height: 20px;"></div>'
+                        '<span style="color: #888;">Searching Samba Scientific knowledge base...</span>'
+                        '</div>',
+                        unsafe_allow_html=True
+                    )
+                    is_streaming = True
+
                 if chunk.get("content"):
+                    if is_streaming:
+                        spinner_placeholder.empty()
+                        is_streaming = False
                     full_response += chunk["content"]
                     response_placeholder.markdown(full_response + "▌")
 
-                if chunk.get("done"):
-                    citations = chunk.get("citations", [])
+            spinner_placeholder.empty()
 
             if not has_error:
                 # Final response
                 if full_response:
                     response_placeholder.markdown(full_response)
-
-                    # Show citations
-                    if citations:
-                        with st.expander("📎 Sources"):
-                            for i, citation in enumerate(citations, 1):
-                                st.caption(f"{i}. {citation}")
                 else:
                     response_placeholder.warning("⚠️ No response generated.")
 
@@ -174,8 +179,7 @@ def render_grok_chat_app():
         if not has_error and full_response:
             st.session_state.grok_messages.append({
                 "role": "assistant",
-                "content": full_response,
-                "citations": citations
+                "content": full_response
             })
 
             st.rerun()
