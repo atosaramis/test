@@ -275,6 +275,15 @@ Discover competitor ad creatives and campaigns running on Google Ads"""
 
         st.button(app7_card, key="app7_btn", use_container_width=True, on_click=navigate_to_app, args=("google_ads",))
 
+    with col8:
+        app8_card = """📝
+
+**Content Generator**
+
+Generate Samba blog posts and LinkedIn content from your text using AI"""
+
+        st.button(app8_card, key="app8_btn", use_container_width=True, on_click=navigate_to_app, args=("claude_skills",))
+
     # Suggest Workflow Button
     st.markdown("<br><br>", unsafe_allow_html=True)
 
@@ -344,6 +353,8 @@ def render_app(app_name):
             st.info("🔧 Tech Stack Analyzer")
         elif app_name == "google_ads":
             st.info("📢 Google Ads Intelligence")
+        elif app_name == "claude_skills":
+            st.info("📝 Content Generator")
 
     # Import and render the appropriate app
     if app_name == "linkedin":
@@ -373,6 +384,10 @@ def render_app(app_name):
     elif app_name == "google_ads":
         from app_google_ads import render_google_ads_app
         render_google_ads_app()
+
+    elif app_name == "claude_skills":
+        from app_claude_skills import render_claude_skills_app
+        render_claude_skills_app()
 
     else:
         st.error(f"Unknown app: {app_name}")

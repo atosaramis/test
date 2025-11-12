@@ -13,3 +13,6 @@ supabase>=2.0.0
 
 # xAI SDK - For Grok Collections Chat
 xai-sdk>=1.4.0
+
+# Anthropic SDK - For Claude Skills API
+anthropic>=0.18.0
