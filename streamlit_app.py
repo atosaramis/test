@@ -222,13 +222,13 @@ Chat with Samba Scientific's website using AI"""
         st.button(app3_card, key="app3_btn", use_container_width=True, on_click=navigate_to_app, args=("grok_chat",))
 
     with col4:
-        app4_card = """🎯
+        app4_card = """🎙️
 
-**Content Planner**
+**Meeting Transcription**
 
-Coming Soon"""
+Transcribe meetings, extract insights, and generate summaries"""
 
-        st.button(app4_card, key="app4_btn", use_container_width=True, on_click=navigate_to_app, args=("app4",))
+        st.button(app4_card, key="app4_btn", use_container_width=True, on_click=navigate_to_app, args=("transcription",))
 
     # Suggest Workflow Button
     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -282,6 +282,8 @@ def render_app(app_name):
             st.info("🔍 Keyword Research")
         elif app_name == "grok_chat":
             st.info("🤖 Samba Knowledge Chat")
+        elif app_name == "transcription":
+            st.info("🎙️ Meeting Transcription")
 
     # Import and render the appropriate app
     if app_name == "linkedin":
@@ -295,6 +297,10 @@ def render_app(app_name):
     elif app_name == "grok_chat":
         from app_grok_chat import render_grok_chat_app
         render_grok_chat_app()
+
+    elif app_name == "transcription":
+        from app_transcription import render_transcription_app
+        render_transcription_app()
 
     else:
         st.error(f"Unknown app: {app_name}")
