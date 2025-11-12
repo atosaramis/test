@@ -182,6 +182,9 @@ def render_dashboard():
             # Clear Grok chat history on logout
             if "grok_messages" in st.session_state:
                 del st.session_state.grok_messages
+            # Clear Sales chat history on logout
+            if "sales_messages" in st.session_state:
+                del st.session_state.sales_messages
             # Clear transcripts on logout
             if "transcripts" in st.session_state:
                 del st.session_state.transcripts
@@ -233,6 +236,20 @@ Transcribe meetings, extract insights, and generate summaries"""
 
         st.button(app4_card, key="app4_btn", use_container_width=True, on_click=navigate_to_app, args=("transcription",))
 
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # App cards - Row 3
+    col5, col6 = st.columns(2, gap="large")
+
+    with col5:
+        app5_card = """🎯
+
+**Sales Menu Chat**
+
+Chat with Samba Scientific's sales menu and services using AI"""
+
+        st.button(app5_card, key="app5_btn", use_container_width=True, on_click=navigate_to_app, args=("sales_chat",))
+
     # Suggest Workflow Button
     st.markdown("<br><br>", unsafe_allow_html=True)
 
@@ -277,6 +294,9 @@ def render_app(app_name):
             # Clear Grok chat history on logout
             if "grok_messages" in st.session_state:
                 del st.session_state.grok_messages
+            # Clear Sales chat history on logout
+            if "sales_messages" in st.session_state:
+                del st.session_state.sales_messages
             # Clear transcripts on logout
             if "transcripts" in st.session_state:
                 del st.session_state.transcripts
@@ -291,6 +311,8 @@ def render_app(app_name):
             st.info("🔍 Keyword Research")
         elif app_name == "grok_chat":
             st.info("🤖 Samba Knowledge Chat")
+        elif app_name == "sales_chat":
+            st.info("🎯 Sales Menu Chat")
         elif app_name == "transcription":
             st.info("🎙️ Meeting Transcription")
 
@@ -306,6 +328,10 @@ def render_app(app_name):
     elif app_name == "grok_chat":
         from app_grok_chat import render_grok_chat_app
         render_grok_chat_app()
+
+    elif app_name == "sales_chat":
+        from app_sales_chat import render_sales_chat_app
+        render_sales_chat_app()
 
     elif app_name == "transcription":
         from app_transcription import render_transcription_app
