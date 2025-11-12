@@ -250,28 +250,28 @@ Chat with Samba Scientific's sales menu and services using AI"""
 
         st.button(app5_card, key="app5_btn", use_container_width=True, on_click=navigate_to_app, args=("sales_chat",))
 
+    with col6:
+        app6_card = """🔧
+
+**Tech Stack Analyzer**
+
+Discover what technologies power any website"""
+
+        st.button(app6_card, key="app6_btn", use_container_width=True, on_click=navigate_to_app, args=("tech_stack",))
+
     st.markdown("<br>", unsafe_allow_html=True)
 
     # App cards - Row 4
     col7, col8 = st.columns(2, gap="large")
 
     with col7:
-        app7_card = """🔧
-
-**Tech Stack Analyzer**
-
-Discover what technologies power any website"""
-
-        st.button(app7_card, key="app7_btn", use_container_width=True, on_click=navigate_to_app, args=("tech_stack",))
-
-    with col8:
-        app8_card = """📢
+        app7_card = """📢
 
 **Google Ads Intelligence**
 
 Analyze competitor Google Ads campaigns and paid keywords"""
 
-        st.button(app8_card, key="app8_btn", use_container_width=True, on_click=navigate_to_app, args=("google_ads",))
+        st.button(app7_card, key="app7_btn", use_container_width=True, on_click=navigate_to_app, args=("google_ads",))
 
     # Suggest Workflow Button
     st.markdown("<br><br>", unsafe_allow_html=True)
