@@ -7,10 +7,9 @@ import streamlit as st
 import os
 import requests
 import pandas as pd
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import base64
 import json
-import time
 
 
 def get_credential(key: str, default=None):
@@ -19,50 +18,6 @@ def get_credential(key: str, default=None):
         return st.secrets.get(key, os.environ.get(key, default))
     except (FileNotFoundError, KeyError):
         return os.environ.get(key, default)
-
-
-def scrape_ad_content(transparency_url: str) -> Optional[Dict[str, Any]]:
-    """
-    Scrape Google Ads Transparency page using Firecrawl to extract ad content.
-
-    Args:
-        transparency_url: URL to Google Ads Transparency page
-
-    Returns:
-        dict: Extracted ad content (headline, description, images) or None if error
-    """
-    api_key = get_credential("FIRECRAWL_API_KEY")
-
-    if not api_key:
-        return None
-
-    try:
-        response = requests.post(
-            "https://api.firecrawl.dev/v1/scrape",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "url": transparency_url,
-                "formats": ["markdown", "html"],
-                "onlyMainContent": True
-            },
-            timeout=30
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "markdown": data.get("data", {}).get("markdown", ""),
-                "html": data.get("data", {}).get("html", ""),
-                "metadata": data.get("data", {}).get("metadata", {})
-            }
-        else:
-            return None
-
-    except Exception as e:
-        return None
 
 
 def get_google_ads_data(domain: str, location_code: int = 2840, limit: int = 100) -> Optional[Dict[str, Any]]:
@@ -137,17 +92,11 @@ def render_google_ads_app():
         st.markdown("### Configuration")
         login = get_credential("DATAFORSEO_LOGIN")
         password = get_credential("DATAFORSEO_PASSWORD")
-        firecrawl_key = get_credential("FIRECRAWL_API_KEY")
 
         if login and password:
             st.success(f"✅ DataForSEO: {login[:5]}...")
         else:
             st.error("❌ DataForSEO credentials missing")
-
-        if firecrawl_key:
-            st.success(f"✅ Firecrawl: {firecrawl_key[:8]}...")
-        else:
-            st.warning("⚠️ Firecrawl API key missing (ad content scraping disabled)")
 
         st.markdown("### Settings")
         location_options = {
@@ -220,30 +169,8 @@ def render_google_ads_app():
                 if ads_data.get("items"):
                     st.markdown("### 📢 Google Ads Creatives")
 
-                    # Check if Firecrawl is available for scraping
-                    firecrawl_key = get_credential("FIRECRAWL_API_KEY")
-                    can_scrape = bool(firecrawl_key)
-                    scrape_limit = 15  # Auto-scrape up to 15 ads without preview images
-
                     # Prepare data for display and export
                     ads_list = []
-                    scraped_count = 0
-                    total_to_scrape = 0
-
-                    # Count how many ads need scraping
-                    if can_scrape:
-                        for item in ads_data["items"]:
-                            preview_image_obj = item.get("preview_image", {})
-                            preview_image_url = preview_image_obj.get("url") if preview_image_obj else None
-                            if not preview_image_url:
-                                total_to_scrape += 1
-
-                    # Show scraping status if needed
-                    if can_scrape and total_to_scrape > 0:
-                        ads_to_scrape = min(total_to_scrape, scrape_limit)
-                        st.info(f"🔍 Scraping {ads_to_scrape} ads without preview images...")
-                        scrape_progress = st.progress(0)
-                        scrape_status = st.empty()
 
                     for idx, item in enumerate(ads_data["items"]):
                         advertiser_id = item.get("advertiser_id", "")
@@ -255,24 +182,21 @@ def render_google_ads_app():
                         first_shown = item.get("first_shown", "N/A")
                         last_shown = item.get("last_shown", "N/A")
 
-                        # DEBUG: Show first ad's full structure
-                        if idx == 0:
-                            st.json(item)
-                            st.write("Available keys:", list(item.keys()))
+                        # Extract preview image URL - try multiple possible field names
+                        preview_image_url = None
 
-                        # Extract preview image URL
-                        preview_image_obj = item.get("preview_image", {})
-                        preview_image_url = preview_image_obj.get("url") if preview_image_obj else None
+                        # Try nested preview_image.url
+                        preview_image_obj = item.get("preview_image")
+                        if preview_image_obj and isinstance(preview_image_obj, dict):
+                            preview_image_url = preview_image_obj.get("url")
 
-                        # Auto-scrape if no preview image and Firecrawl is available
-                        scraped_content = None
-                        if not preview_image_url and can_scrape and scraped_count < scrape_limit and url:
-                            scrape_status.text(f"Scraping ad {scraped_count + 1}...")
-                            scraped_content = scrape_ad_content(url)
-                            scraped_count += 1
-                            if total_to_scrape > 0:
-                                scrape_progress.progress(min(scraped_count / min(total_to_scrape, scrape_limit), 1.0))
-                            time.sleep(0.5)  # Rate limiting
+                        # Try flat preview_image_url
+                        if not preview_image_url:
+                            preview_image_url = item.get("preview_image_url")
+
+                        # Try previewImageUrl (camelCase)
+                        if not preview_image_url:
+                            preview_image_url = item.get("previewImageUrl")
 
                         ads_list.append({
                             "Advertiser": title,
@@ -283,9 +207,7 @@ def render_google_ads_app():
                             "Advertiser ID": advertiser_id,
                             "Creative ID": creative_id,
                             "Transparency URL": url,
-                            "Preview Image URL": preview_image_url or "",
-                            "Has Preview": "Yes" if preview_image_url else "No",
-                            "Scraped Content": "Yes" if scraped_content else "No"
+                            "Preview Image URL": preview_image_url or ""
                         })
 
                         # Display individual ad card
@@ -299,38 +221,17 @@ def render_google_ads_app():
                                 if verified:
                                     st.markdown("✅ **Verified**")
 
-                            # Show ad content in priority order: preview image > scraped content > info message
+                            # Display preview image if available
                             if preview_image_url:
-                                st.markdown("**🖼️ Ad Preview:**")
                                 st.image(preview_image_url, use_column_width=True)
-                            elif scraped_content:
-                                st.markdown("**📄 Ad Content:**")
-                                content_markdown = scraped_content.get("markdown", "")
-                                if content_markdown:
-                                    # Display in a nice box
-                                    st.markdown(f"""
-                                    <div style="padding: 1rem; background-color: #f0f2f6; border-radius: 8px; border-left: 4px solid #4CAF50;">
-                                    {content_markdown}
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                else:
-                                    st.caption("Content extraction in progress...")
                             else:
-                                if can_scrape:
-                                    st.caption("⏩ Skipped (exceeds scrape limit)")
-                                else:
-                                    st.warning("⚠️ Add FIRECRAWL_API_KEY to secrets.toml to extract ad content")
+                                st.info("ℹ️ Preview not available for this ad")
 
                             # Link to full details
                             if url:
-                                st.markdown(f"[🔗 View full details on Google Ads Transparency]({url})")
+                                st.markdown(f"[🔗 View ad on Google Ads Transparency Center]({url})")
 
                             st.markdown("---")
-
-                    # Clear scraping status
-                    if can_scrape and total_to_scrape > 0:
-                        scrape_status.empty()
-                        scrape_progress.empty()
 
                     # Export functionality
                     st.markdown("### 📥 Export Data")
