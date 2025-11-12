@@ -140,19 +140,8 @@ def render_google_ads_app():
         with st.spinner(f"🔍 Analyzing Google Ads campaigns for {domain}..."):
             result = get_google_ads_data(domain, location_code, limit)
 
-        # Debug section (collapsed by default)
-        with st.expander("🐛 Debug Info - API Request", expanded=False):
-            st.write(f"**Original input:** `{domain_input}`")
-            st.write(f"**Cleaned domain sent to API:** `{domain}`")
-            st.write(f"**Location:** {location_name} ({location_code})")
-            st.write(f"**Max Results:** {limit}")
-
         if result and result.get("tasks"):
             task = result["tasks"][0]
-
-            # Show full task response in debug (collapsed by default)
-            with st.expander("🐛 Debug Info - Full API Response", expanded=False):
-                st.json(result)
 
             if task.get("result") and len(task["result"]) > 0:
                 ads_data = task["result"][0]
@@ -270,10 +259,6 @@ def render_google_ads_app():
                         mime="text/csv",
                         use_container_width=True
                     )
-
-                    # Show raw data option
-                    with st.expander("🔍 View Raw API Response"):
-                        st.json(ads_data)
 
                 else:
                     st.info(f"ℹ️ No paid keywords found for {domain} in {location_name}.")

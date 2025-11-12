@@ -120,17 +120,8 @@ def render_tech_stack_app():
         with st.spinner(f"🔍 Analyzing technology stack for {domain}..."):
             result = analyze_tech_stack(domain)
 
-        # Debug section (collapsed by default)
-        with st.expander("🐛 Debug Info - API Request", expanded=False):
-            st.write(f"**Original input:** `{domain_input}`")
-            st.write(f"**Cleaned domain sent to API:** `{domain}`")
-
         if result and result.get("tasks"):
             task = result["tasks"][0]
-
-            # Show full task response in debug (collapsed by default)
-            with st.expander("🐛 Debug Info - Full API Response", expanded=False):
-                st.json(result)
 
             if task.get("result") and len(task["result"]) > 0:
                 tech_data = task["result"][0]
@@ -226,25 +217,27 @@ def render_tech_stack_app():
                     cost = task.get("cost", 0)
                     st.metric("API Cost", f"${cost:.4f}")
 
-                # Contact information (collapsed)
-                with st.expander("📞 Contact Information", expanded=False):
+                # Contact information - displayed openly
+                if tech_data.get("emails") or tech_data.get("phone_numbers") or tech_data.get("social_graph_urls"):
+                    st.markdown("### 📞 Contact Information")
+
                     col1, col2 = st.columns(2)
                     with col1:
                         if tech_data.get("emails"):
                             st.markdown("**📧 Emails:**")
-                            for email in tech_data["emails"]:
-                                # Remove duplicate entries and zero-width characters
-                                clean_email = email.strip().replace("​", "")
-                                st.markdown(f"- {clean_email}")
+                            # Remove duplicates by converting to set, then back to list
+                            unique_emails = list(dict.fromkeys([email.strip().replace("​", "") for email in tech_data["emails"]]))
+                            for email in unique_emails:
+                                st.markdown(f"- {email}")
                     with col2:
                         if tech_data.get("phone_numbers"):
                             st.markdown("**📞 Phone Numbers:**")
-                            for phone in tech_data["phone_numbers"]:
-                                # Remove duplicate entries and zero-width characters
-                                clean_phone = phone.strip().replace("​", "")
-                                st.markdown(f"- {clean_phone}")
+                            # Remove duplicates
+                            unique_phones = list(dict.fromkeys([phone.strip().replace("​", "") for phone in tech_data["phone_numbers"]]))
+                            for phone in unique_phones:
+                                st.markdown(f"- {phone}")
 
-                    # Social media in same expander
+                    # Social media
                     if tech_data.get("social_graph_urls"):
                         st.markdown("**🔗 Social Media:**")
                         for url in tech_data["social_graph_urls"]:
@@ -262,6 +255,8 @@ def render_tech_stack_app():
                             else:
                                 platform = url.split("/")[2] if "/" in url else url
                             st.markdown(f"- [{platform}]({url})")
+
+                    st.markdown("")  # spacing
 
                 # Display technologies
                 if tech_by_category:
@@ -317,10 +312,6 @@ def render_tech_stack_app():
                             mime="application/json",
                             use_container_width=True
                         )
-
-                    # Show raw data option
-                    with st.expander("🔍 View Raw API Response"):
-                        st.json(tech_data)
 
                 else:
                     st.info("ℹ️ No technologies detected for this domain.")
