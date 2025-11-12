@@ -250,6 +250,29 @@ Chat with Samba Scientific's sales menu and services using AI"""
 
         st.button(app5_card, key="app5_btn", use_container_width=True, on_click=navigate_to_app, args=("sales_chat",))
 
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # App cards - Row 4
+    col7, col8 = st.columns(2, gap="large")
+
+    with col7:
+        app7_card = """🔧
+
+**Tech Stack Analyzer**
+
+Discover what technologies power any website"""
+
+        st.button(app7_card, key="app7_btn", use_container_width=True, on_click=navigate_to_app, args=("tech_stack",))
+
+    with col8:
+        app8_card = """📢
+
+**Google Ads Intelligence**
+
+Analyze competitor Google Ads campaigns and paid keywords"""
+
+        st.button(app8_card, key="app8_btn", use_container_width=True, on_click=navigate_to_app, args=("google_ads",))
+
     # Suggest Workflow Button
     st.markdown("<br><br>", unsafe_allow_html=True)
 
@@ -315,6 +338,10 @@ def render_app(app_name):
             st.info("🎯 Sales Menu Chat")
         elif app_name == "transcription":
             st.info("🎙️ Meeting Transcription")
+        elif app_name == "tech_stack":
+            st.info("🔧 Tech Stack Analyzer")
+        elif app_name == "google_ads":
+            st.info("📢 Google Ads Intelligence")
 
     # Import and render the appropriate app
     if app_name == "linkedin":
@@ -336,6 +363,14 @@ def render_app(app_name):
     elif app_name == "transcription":
         from app_transcription import render_transcription_app
         render_transcription_app()
+
+    elif app_name == "tech_stack":
+        from app_tech_stack import render_tech_stack_app
+        render_tech_stack_app()
+
+    elif app_name == "google_ads":
+        from app_google_ads import render_google_ads_app
+        render_google_ads_app()
 
     else:
         st.error(f"Unknown app: {app_name}")
