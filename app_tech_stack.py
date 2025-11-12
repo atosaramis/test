@@ -9,6 +9,7 @@ import requests
 import pandas as pd
 from typing import Dict, Any, Optional
 import base64
+import json
 
 
 def get_credential(key: str, default=None):
@@ -266,7 +267,7 @@ def render_tech_stack_app():
                 if tech_by_category:
                     st.markdown("### 🛠️ Technology Stack")
 
-                    # Display by category - more compact format
+                    # Display by category - open and visible
                     for category, subcategories in sorted(tech_by_category.items()):
                         # Pick emoji based on category
                         emoji_map = {
@@ -280,27 +281,42 @@ def render_tech_stack_app():
                         }
                         emoji = emoji_map.get(category, "🔧")
 
-                        with st.expander(f"{emoji} **{category}**", expanded=False):
-                            for subcategory, technologies in sorted(subcategories.items()):
-                                # Remove duplicates from technology list
-                                unique_techs = list(dict.fromkeys(technologies))
-                                tech_str = ", ".join(unique_techs)
-                                st.markdown(f"**{subcategory}:** {tech_str}")
+                        st.markdown(f"#### {emoji} {category}")
+                        for subcategory, technologies in sorted(subcategories.items()):
+                            # Remove duplicates from technology list
+                            unique_techs = list(dict.fromkeys(technologies))
+                            tech_str = ", ".join(unique_techs)
+                            st.markdown(f"**{subcategory}:** {tech_str}")
+                        st.markdown("")  # spacing between categories
 
                     # Export functionality
                     st.markdown("---")
                     st.markdown("### 📥 Export Data")
 
-                    df = pd.DataFrame(tech_list)
-                    csv = df.to_csv(index=False)
+                    col1, col2 = st.columns(2)
 
-                    st.download_button(
-                        label="📄 Download as CSV",
-                        data=csv,
-                        file_name=f"tech_stack_{domain}.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
+                    with col1:
+                        df = pd.DataFrame(tech_list)
+                        csv = df.to_csv(index=False)
+
+                        st.download_button(
+                            label="📄 Download CSV",
+                            data=csv,
+                            file_name=f"tech_stack_{domain}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+
+                    with col2:
+                        json_data = json.dumps(tech_data, indent=2)
+
+                        st.download_button(
+                            label="📦 Download JSON",
+                            data=json_data,
+                            file_name=f"tech_stack_{domain}.json",
+                            mime="application/json",
+                            use_container_width=True
+                        )
 
                     # Show raw data option
                     with st.expander("🔍 View Raw API Response"):
