@@ -182,6 +182,9 @@ def render_dashboard():
             # Clear Grok chat history on logout
             if "grok_messages" in st.session_state:
                 del st.session_state.grok_messages
+            # Clear transcripts on logout
+            if "transcripts" in st.session_state:
+                del st.session_state.transcripts
             st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -271,6 +274,12 @@ def render_app(app_name):
         st.markdown("### Navigation")
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.authenticated = False
+            # Clear Grok chat history on logout
+            if "grok_messages" in st.session_state:
+                del st.session_state.grok_messages
+            # Clear transcripts on logout
+            if "transcripts" in st.session_state:
+                del st.session_state.transcripts
             st.query_params.clear()
             st.rerun()
 
