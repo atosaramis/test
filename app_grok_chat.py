@@ -133,40 +133,22 @@ def render_grok_chat_app():
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        # Stream response using SDK
+        # Stream response using SDK with spinner
         with st.chat_message("assistant"):
             response_placeholder = st.empty()
-            spinner_placeholder = st.empty()
             full_response = ""
             has_error = False
-            is_streaming = False
 
-            for chunk in chat_with_collection_sdk([collection_id], user_input):
-                if chunk.get("error"):
-                    spinner_placeholder.empty()
-                    st.error(f"❌ {chunk['error']}")
-                    has_error = True
-                    break
+            with st.spinner("🔍 Searching Samba Scientific knowledge base..."):
+                for chunk in chat_with_collection_sdk([collection_id], user_input):
+                    if chunk.get("error"):
+                        st.error(f"❌ {chunk['error']}")
+                        has_error = True
+                        break
 
-                if chunk.get("status") == "streaming":
-                    # Show modern spinner while searching
-                    spinner_placeholder.markdown(
-                        '<div style="display: flex; align-items: center; gap: 10px;">'
-                        '<div class="stSpinner" style="width: 20px; height: 20px;"></div>'
-                        '<span style="color: #888;">Searching Samba Scientific knowledge base...</span>'
-                        '</div>',
-                        unsafe_allow_html=True
-                    )
-                    is_streaming = True
-
-                if chunk.get("content"):
-                    if is_streaming:
-                        spinner_placeholder.empty()
-                        is_streaming = False
-                    full_response += chunk["content"]
-                    response_placeholder.markdown(full_response + "▌")
-
-            spinner_placeholder.empty()
+                    if chunk.get("content"):
+                        full_response += chunk["content"]
+                        response_placeholder.markdown(full_response + "▌")
 
             if not has_error:
                 # Final response

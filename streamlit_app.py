@@ -179,6 +179,9 @@ def render_dashboard():
     with col3:
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.authenticated = False
+            # Clear Grok chat history on logout
+            if "grok_messages" in st.session_state:
+                del st.session_state.grok_messages
             st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
