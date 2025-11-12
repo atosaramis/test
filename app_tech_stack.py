@@ -119,8 +119,17 @@ def render_tech_stack_app():
         with st.spinner(f"🔍 Analyzing technology stack for {domain}..."):
             result = analyze_tech_stack(domain)
 
+        # Debug section
+        with st.expander("🐛 Debug Info - API Request"):
+            st.write(f"**Original input:** `{domain_input}`")
+            st.write(f"**Cleaned domain sent to API:** `{domain}`")
+
         if result and result.get("tasks"):
             task = result["tasks"][0]
+
+            # Show full task response in debug
+            with st.expander("🐛 Debug Info - Full API Response"):
+                st.json(result)
 
             if task.get("result") and len(task["result"]) > 0:
                 tech_data = task["result"][0]

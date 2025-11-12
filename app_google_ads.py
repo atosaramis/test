@@ -140,8 +140,19 @@ def render_google_ads_app():
         with st.spinner(f"🔍 Analyzing Google Ads campaigns for {domain}..."):
             result = get_google_ads_data(domain, location_code, limit)
 
+        # Debug section
+        with st.expander("🐛 Debug Info - API Request"):
+            st.write(f"**Original input:** `{domain_input}`")
+            st.write(f"**Cleaned domain sent to API:** `{domain}`")
+            st.write(f"**Location:** {location_name} ({location_code})")
+            st.write(f"**Max Results:** {limit}")
+
         if result and result.get("tasks"):
             task = result["tasks"][0]
+
+            # Show full task response in debug
+            with st.expander("🐛 Debug Info - Full API Response"):
+                st.json(result)
 
             if task.get("result") and len(task["result"]) > 0:
                 ads_data = task["result"][0]
