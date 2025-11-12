@@ -79,19 +79,52 @@ def execute_skill(skill_id: str, content: str, model: str = "claude-sonnet-4-5-2
         return None
 
 
-def extract_text_from_response(response) -> str:
-    """Extract text content from API response."""
+def extract_text_from_response(response) -> tuple:
+    """
+    Extract text content and files from API response.
+    Returns: (text_content, file_info)
+    """
     if not response or not hasattr(response, 'content'):
-        return ""
+        return "", None
 
     text_parts = []
+    file_info = None
+
     for block in response.content:
+        # Check for files first (priority)
+        if block.type == 'tool_use':
+            # Look inside tool_use for bash results
+            if hasattr(block, 'content'):
+                for item in block.content if isinstance(block.content, list) else []:
+                    if hasattr(item, 'type') and item.type == 'file':
+                        file_info = {
+                            'file_id': item.file_id,
+                            'filename': item.filename if hasattr(item, 'filename') else 'output.txt'
+                        }
+
+        # Also check bash_code_execution_tool_result blocks
+        if hasattr(block, 'type') and 'bash' in str(block.type).lower():
+            if hasattr(block, 'content'):
+                # Handle nested content structure
+                content = block.content
+                if isinstance(content, dict):
+                    if content.get('type') == 'bash_code_execution_result':
+                        result_content = content.get('content', [])
+                        if isinstance(result_content, list):
+                            for item in result_content:
+                                if isinstance(item, dict) and item.get('type') == 'file':
+                                    file_info = {
+                                        'file_id': item.get('file_id'),
+                                        'filename': item.get('filename', 'output.txt')
+                                    }
+
+        # Extract text content
         if hasattr(block, 'text'):
             text_parts.append(block.text)
         elif block.type == 'text':
             text_parts.append(block.text if hasattr(block, 'text') else str(block))
 
-    return "\n".join(text_parts)
+    return "\n".join(text_parts), file_info
 
 
 def extract_file_from_response(response):
@@ -299,15 +332,51 @@ def render_claude_skills_app():
             response = execute_skill(blog_skill_id, content_input, model, max_tokens)
 
             if response:
-                output = extract_text_from_response(response)
+                output_text, file_info = extract_text_from_response(response)
 
-                if output:
-                    # Store in session state
+                # If skill generated a file, download and display it
+                if file_info:
+                    with st.spinner("📥 Retrieving generated content..."):
+                        file_bytes = download_file_from_api(file_info['file_id'], file_info['filename'])
+                        if file_bytes:
+                            # Try to decode as text
+                            try:
+                                output = file_bytes.decode('utf-8')
+                                st.session_state.generated_content = output
+                                st.session_state.container_id = response.container.id if hasattr(response, 'container') else None
+                                st.session_state.content_type = "Blog Post"
+                                st.markdown(output)
+                            except:
+                                st.error("❌ Could not decode file content as text")
+                                output = None
+                        else:
+                            output = None
+                # Otherwise use text output
+                elif output_text:
+                    output = output_text
                     st.session_state.generated_content = output
                     st.session_state.container_id = response.container.id if hasattr(response, 'container') else None
                     st.session_state.content_type = "Blog Post"
-
                     st.markdown(output)
+                else:
+                    output = None
+
+                # Debug output
+                with st.expander("🔍 Debug - View API Response"):
+                    st.json({
+                        "has_output": bool(output) if 'output' in locals() else False,
+                        "has_file": bool(file_info),
+                        "has_text": bool(output_text),
+                        "container_id": response.container.id if hasattr(response, 'container') else None,
+                        "response_type": str(type(response)),
+                        "content_blocks": len(response.content) if hasattr(response, 'content') else 0
+                    })
+                    if file_info:
+                        st.write("**File Info:**", file_info)
+                    if output_text:
+                        st.write("**Text Output:**", output_text[:500] + "..." if len(output_text) > 500 else output_text)
+
+                if output:
 
                     # Export options
                     st.markdown("### 📥 Export Options")
@@ -394,15 +463,51 @@ def render_claude_skills_app():
             response = execute_skill(linkedin_skill_id, content_input, model, max_tokens)
 
             if response:
-                output = extract_text_from_response(response)
+                output_text, file_info = extract_text_from_response(response)
 
-                if output:
-                    # Store in session state
+                # If skill generated a file, download and display it
+                if file_info:
+                    with st.spinner("📥 Retrieving generated content..."):
+                        file_bytes = download_file_from_api(file_info['file_id'], file_info['filename'])
+                        if file_bytes:
+                            # Try to decode as text
+                            try:
+                                output = file_bytes.decode('utf-8')
+                                st.session_state.generated_content = output
+                                st.session_state.container_id = response.container.id if hasattr(response, 'container') else None
+                                st.session_state.content_type = "LinkedIn Post"
+                                st.markdown(output)
+                            except:
+                                st.error("❌ Could not decode file content as text")
+                                output = None
+                        else:
+                            output = None
+                # Otherwise use text output
+                elif output_text:
+                    output = output_text
                     st.session_state.generated_content = output
                     st.session_state.container_id = response.container.id if hasattr(response, 'container') else None
                     st.session_state.content_type = "LinkedIn Post"
-
                     st.markdown(output)
+                else:
+                    output = None
+
+                # Debug output
+                with st.expander("🔍 Debug - View API Response"):
+                    st.json({
+                        "has_output": bool(output) if 'output' in locals() else False,
+                        "has_file": bool(file_info),
+                        "has_text": bool(output_text),
+                        "container_id": response.container.id if hasattr(response, 'container') else None,
+                        "response_type": str(type(response)),
+                        "content_blocks": len(response.content) if hasattr(response, 'content') else 0
+                    })
+                    if file_info:
+                        st.write("**File Info:**", file_info)
+                    if output_text:
+                        st.write("**Text Output:**", output_text[:500] + "..." if len(output_text) > 500 else output_text)
+
+                if output:
 
                     # Export options
                     st.markdown("### 📥 Export Options")
