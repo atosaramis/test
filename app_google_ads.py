@@ -161,24 +161,6 @@ def render_google_ads_app():
 
         limit = st.slider("Max Results", min_value=10, max_value=1000, value=100, step=10)
 
-        # Scraping options
-        scrape_enabled = st.checkbox(
-            "Scrape ad content (fallback)",
-            value=False,
-            help="Use Firecrawl to extract text for ads without preview images (uses API credits)",
-            disabled=not firecrawl_key
-        )
-
-        if scrape_enabled:
-            scrape_limit = st.slider(
-                "Max ads to scrape",
-                min_value=1,
-                max_value=20,
-                value=10,
-                help="Only scrapes ads without preview images"
-            )
-        else:
-            scrape_limit = 0
 
     # Main input
     st.markdown("### Enter Domain to Analyze")
@@ -238,12 +220,28 @@ def render_google_ads_app():
                 if ads_data.get("items"):
                     st.markdown("### 📢 Google Ads Creatives")
 
+                    # Check if Firecrawl is available for scraping
+                    firecrawl_key = get_credential("FIRECRAWL_API_KEY")
+                    can_scrape = bool(firecrawl_key)
+                    scrape_limit = 15  # Auto-scrape up to 15 ads without preview images
+
                     # Prepare data for display and export
                     ads_list = []
                     scraped_count = 0
+                    total_to_scrape = 0
 
-                    # Show scraping status if enabled
-                    if scrape_enabled and scrape_limit > 0:
+                    # Count how many ads need scraping
+                    if can_scrape:
+                        for item in ads_data["items"]:
+                            preview_image_obj = item.get("preview_image", {})
+                            preview_image_url = preview_image_obj.get("url") if preview_image_obj else None
+                            if not preview_image_url:
+                                total_to_scrape += 1
+
+                    # Show scraping status if needed
+                    if can_scrape and total_to_scrape > 0:
+                        ads_to_scrape = min(total_to_scrape, scrape_limit)
+                        st.info(f"🔍 Scraping {ads_to_scrape} ads without preview images...")
                         scrape_progress = st.progress(0)
                         scrape_status = st.empty()
 
@@ -261,13 +259,14 @@ def render_google_ads_app():
                         preview_image_obj = item.get("preview_image", {})
                         preview_image_url = preview_image_obj.get("url") if preview_image_obj else None
 
-                        # Only scrape if no preview image and scraping is enabled
+                        # Auto-scrape if no preview image and Firecrawl is available
                         scraped_content = None
-                        if not preview_image_url and scrape_enabled and scraped_count < scrape_limit and url:
-                            scrape_status.text(f"Scraping ad {scraped_count + 1}/{scrape_limit}...")
+                        if not preview_image_url and can_scrape and scraped_count < scrape_limit and url:
+                            scrape_status.text(f"Scraping ad {scraped_count + 1}...")
                             scraped_content = scrape_ad_content(url)
                             scraped_count += 1
-                            scrape_progress.progress(scraped_count / scrape_limit)
+                            if total_to_scrape > 0:
+                                scrape_progress.progress(min(scraped_count / min(total_to_scrape, scrape_limit), 1.0))
                             time.sleep(0.5)  # Rate limiting
 
                         ads_list.append({
@@ -295,7 +294,7 @@ def render_google_ads_app():
                                 if verified:
                                     st.markdown("✅ **Verified**")
 
-                            # Show ad content in priority order: preview image > scraped content > scraping prompt
+                            # Show ad content in priority order: preview image > scraped content > info message
                             if preview_image_url:
                                 st.markdown("**🖼️ Ad Preview:**")
                                 st.image(preview_image_url, use_column_width=True)
@@ -312,7 +311,10 @@ def render_google_ads_app():
                                 else:
                                     st.caption("Content extraction in progress...")
                             else:
-                                st.info("💡 Enable 'Scrape ad content' in sidebar to extract actual ad text")
+                                if can_scrape:
+                                    st.caption("⏩ Skipped (exceeds scrape limit)")
+                                else:
+                                    st.warning("⚠️ Add FIRECRAWL_API_KEY to secrets.toml to extract ad content")
 
                             # Link to full details
                             if url:
@@ -321,7 +323,7 @@ def render_google_ads_app():
                             st.markdown("---")
 
                     # Clear scraping status
-                    if scrape_enabled and scrape_limit > 0:
+                    if can_scrape and total_to_scrape > 0:
                         scrape_status.empty()
                         scrape_progress.empty()
 
