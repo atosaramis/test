@@ -269,7 +269,7 @@ Discover what technologies power any website"""
 
 **Google Ads Intelligence**
 
-Analyze competitor Google Ads campaigns and paid keywords"""
+Discover competitor ad creatives and campaigns running on Google Ads"""
 
         st.button(app7_card, key="app7_btn", use_container_width=True, on_click=navigate_to_app, args=("google_ads",))
 
