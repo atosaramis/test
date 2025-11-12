@@ -215,7 +215,7 @@ Advanced SEO keyword research with search volume and competitor analysis"""
     with col3:
         app3_card = """🤖
 
-**Grok Collections Chat**
+**Samba Knowledge Chat**
 
 Chat with Samba Scientific knowledge base using AI"""
 
@@ -281,7 +281,7 @@ def render_app(app_name):
         elif app_name == "keywords":
             st.info("🔍 Keyword Research")
         elif app_name == "grok_chat":
-            st.info("🤖 Grok Collections Chat")
+            st.info("🤖 Samba Knowledge Chat")
 
     # Import and render the appropriate app
     if app_name == "linkedin":

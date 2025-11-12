@@ -76,10 +76,10 @@ def chat_with_collection_sdk(collection_ids: List[str], user_message: str):
 
 
 def render_grok_chat_app():
-    """Render the Grok Collections Chat interface."""
+    """Render the Samba Knowledge Chat interface."""
 
-    st.markdown("## 🤖 Chat with Samba Scientific Knowledge Base")
-    st.caption("Powered by Grok and xAI Collections - Ask questions about Samba Scientific")
+    st.markdown("## 🤖 Samba Knowledge Chat")
+    st.caption("Ask questions about Samba Scientific using AI-powered search")
 
     # Get collection ID from secrets
     collection_id = get_credential("SAMBA_COLLECTION_ID")
