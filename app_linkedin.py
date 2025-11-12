@@ -85,84 +85,174 @@ def render_linkedin_app():
                 linkedin_url = client_linkedin_url.strip()
                 domain = client_domain.strip()
 
-                with st.spinner("Onboarding client..."):
-                    # Extract company name
-                    company_name = linkedin_url.split('/')[-2] if '/' in linkedin_url else "Unknown Client"
+                # Extract company name
+                company_name = linkedin_url.split('/')[-2] if '/' in linkedin_url else "Unknown Client"
 
-                    status = st.empty()
+                st.markdown(f"### 🚀 Onboarding **{company_name}**")
+                st.markdown("---")
 
-                    # Step 1: Fetch LinkedIn posts
-                    status.text("📥 Fetching LinkedIn posts...")
+                # Progress tracking
+                progress_container = st.container()
+                results = {
+                    "posts": {"status": "pending", "data": None, "error": None},
+                    "voice": {"status": "pending", "data": None, "error": None},
+                    "strategy": {"status": "pending", "data": None, "error": None},
+                    "engagement": {"status": "pending", "data": None, "error": None},
+                    "keywords": {"status": "pending", "data": None, "error": None},
+                    "ai_perception": {"status": "pending", "data": None, "error": None}
+                }
 
-                    response = fetch_linkedin_posts(linkedin_url)
+                # Step 1: Fetch LinkedIn posts
+                with progress_container:
+                    status_posts = st.empty()
+                    status_posts.info("📥 **Fetching LinkedIn posts...**")
 
-                    if not response.get("error"):
-                        # Save raw posts to database
-                        save_linkedin_posts_to_db(linkedin_url, response.get("raw_response", {}))
+                response = fetch_linkedin_posts(linkedin_url)
 
-                        data = response.get("data", {})
-                        posts = data.get("data", [])
+                if not response.get("error"):
+                    data = response.get("data", {})
+                    posts = data.get("data", [])
+                    save_linkedin_posts_to_db(linkedin_url, response.get("raw_response", {}))
+                    results["posts"]["status"] = "success"
+                    results["posts"]["data"] = posts
+                    status_posts.success(f"✅ **Fetched {len(posts)} LinkedIn posts**")
 
-                        # Step 2: Analyze voice & strategy
-                        status.text(f"🤖 Analyzing {len(posts)} posts...")
-                        analysis_result = analyze_company_complete(
-                            posts_list=posts,
-                            company_name=company_name,
-                            company_url=linkedin_url,
-                            model=analysis_model
-                        )
-                        save_company_analysis(analysis_result)
+                    # Step 2: Analyze with AI (voice, strategy, engagement)
+                    status_analysis = st.empty()
+                    status_analysis.info(f"🤖 **Analyzing {len(posts)} posts with AI...**")
 
-                        # Step 3: Fetch ranked keywords
-                        status.text(f"🔍 Fetching {keyword_limit_default} ranked keywords...")
-                        ranked_keywords_result = get_ranked_keywords_for_domain(
-                            domain=domain,
-                            limit=keyword_limit_default,
-                            include_paid=include_paid_default,
-                            max_position=max_position_default
-                        )
+                    analysis_result = analyze_company_complete(
+                        posts_list=posts,
+                        company_name=company_name,
+                        company_url=linkedin_url,
+                        model=analysis_model
+                    )
 
-                        if not ranked_keywords_result.get('error'):
-                            update_company_ranked_keywords(
-                                company_url=linkedin_url,
-                                ranked_keywords_data=ranked_keywords_result,
-                                domain=domain
-                            )
+                    # Check individual analysis results
+                    voice_profile = analysis_result.get("voice_profile", {})
+                    content_pillars = analysis_result.get("content_pillars", {})
+                    engagement_metrics = analysis_result.get("engagement_metrics", {})
 
-                        # Step 4: Query AI perception
-                        status.text(f"🔮 Querying ChatGPT...")
-                        ai_perception_result = query_llm_about_company(
-                            company_name=company_name,
-                            domain=domain,
-                            llm_provider="chatgpt",
-                            custom_prompt=None  # Use defaults
-                        )
-
-                        if not ai_perception_result.get('error'):
-                            update_company_ai_perception(
-                                company_url=linkedin_url,
-                                ai_perception_data=ai_perception_result
-                            )
-
-                        status.empty()
-
-                        # Success message
-                        st.success(f"✅ Client **{company_name}** successfully onboarded!")
-
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("Posts Analyzed", len(posts))
-                        with col2:
-                            kw_count = ranked_keywords_result.get('count', 0) if not ranked_keywords_result.get('error') else 0
-                            st.metric("Keywords Found", kw_count)
-                        with col3:
-                            ai_count = len(ai_perception_result.get('responses', [])) if not ai_perception_result.get('error') else 0
-                            st.metric("AI Queries", ai_count)
-
-                        st.info("👉 Go to **'My Clients'** tab to view the full analysis")
-
+                    if voice_profile.get("error"):
+                        results["voice"]["status"] = "failed"
+                        results["voice"]["error"] = voice_profile.get("error")
                     else:
-                        st.error(f"❌ Error fetching posts: {response.get('error')}")
+                        results["voice"]["status"] = "success"
+                        results["voice"]["data"] = voice_profile
+
+                    if content_pillars.get("error"):
+                        results["strategy"]["status"] = "failed"
+                        results["strategy"]["error"] = content_pillars.get("error")
+                    else:
+                        results["strategy"]["status"] = "success"
+                        results["strategy"]["data"] = content_pillars
+
+                    if engagement_metrics.get("error"):
+                        results["engagement"]["status"] = "failed"
+                        results["engagement"]["error"] = engagement_metrics.get("error")
+                    else:
+                        results["engagement"]["status"] = "success"
+                        results["engagement"]["data"] = engagement_metrics
+
+                    # Save analysis
+                    save_company_analysis(analysis_result)
+
+                    # Update status for AI analysis
+                    ai_success_count = sum(1 for r in [results["voice"], results["strategy"], results["engagement"]] if r["status"] == "success")
+                    if ai_success_count == 3:
+                        status_analysis.success(f"✅ **AI analysis complete** (Voice, Strategy, Engagement)")
+                    elif ai_success_count > 0:
+                        status_analysis.warning(f"⚠️ **AI analysis partial** ({ai_success_count}/3 succeeded)")
+                    else:
+                        status_analysis.error(f"❌ **AI analysis failed** (all 3 analyses failed)")
+
+                    # Step 3: Fetch ranked keywords
+                    status_keywords = st.empty()
+                    status_keywords.info(f"🔍 **Fetching ranked keywords for {domain}...**")
+
+                    ranked_keywords_result = get_ranked_keywords_for_domain(
+                        domain=domain,
+                        limit=keyword_limit_default,
+                        include_paid=include_paid_default,
+                        max_position=max_position_default
+                    )
+
+                    if not ranked_keywords_result.get('error'):
+                        update_company_ranked_keywords(
+                            company_url=linkedin_url,
+                            ranked_keywords_data=ranked_keywords_result,
+                            domain=domain
+                        )
+                        results["keywords"]["status"] = "success"
+                        results["keywords"]["data"] = ranked_keywords_result
+                        kw_count = ranked_keywords_result.get('count', 0)
+                        status_keywords.success(f"✅ **Found {kw_count} ranked keywords**")
+                    else:
+                        results["keywords"]["status"] = "failed"
+                        results["keywords"]["error"] = ranked_keywords_result.get('error')
+                        status_keywords.error(f"❌ **Keyword fetch failed**: {ranked_keywords_result.get('error')}")
+
+                    # Step 4: Query AI perception
+                    status_ai = st.empty()
+                    status_ai.info(f"🔮 **Querying AI about {company_name}...**")
+
+                    ai_perception_result = query_llm_about_company(
+                        company_name=company_name,
+                        domain=domain,
+                        llm_provider="chatgpt",
+                        custom_prompt=None
+                    )
+
+                    if not ai_perception_result.get('error'):
+                        update_company_ai_perception(
+                            company_url=linkedin_url,
+                            ai_perception_data=ai_perception_result
+                        )
+                        results["ai_perception"]["status"] = "success"
+                        results["ai_perception"]["data"] = ai_perception_result
+                        ai_count = len(ai_perception_result.get('responses', []))
+                        status_ai.success(f"✅ **AI perception complete** ({ai_count} queries)")
+                    else:
+                        results["ai_perception"]["status"] = "failed"
+                        results["ai_perception"]["error"] = ai_perception_result.get('error')
+                        status_ai.error(f"❌ **AI perception failed**: {ai_perception_result.get('error')}")
+
+                    # Summary
+                    st.markdown("---")
+                    st.markdown("### 📊 Onboarding Summary")
+
+                    success_count = sum(1 for r in results.values() if r["status"] == "success")
+                    total_count = len(results)
+
+                    if success_count == total_count:
+                        st.success(f"🎉 **All analyses complete!** ({success_count}/{total_count})")
+                    elif success_count > 0:
+                        st.warning(f"⚠️ **Partial success** ({success_count}/{total_count} analyses succeeded)")
+                    else:
+                        st.error(f"❌ **Onboarding failed** (0/{total_count} analyses succeeded)")
+
+                    # Show failed analyses with errors
+                    failed_analyses = [(name, data) for name, data in results.items() if data["status"] == "failed"]
+                    if failed_analyses:
+                        st.markdown("#### ❌ Failed Analyses:")
+                        for name, data in failed_analyses:
+                            with st.expander(f"🔴 {name.replace('_', ' ').title()} - Click for details"):
+                                st.error(data["error"])
+                                st.caption("**Next steps:**")
+                                if "OpenRouter" in data["error"]:
+                                    st.info("• Check OPENROUTER_API_KEY in secrets\n• Verify you have credits at openrouter.ai\n• Try a different model")
+                                elif "DataForSEO" in data["error"]:
+                                    st.info("• Check DATAFORSEO credentials in secrets\n• Verify domain is valid\n• Check DataForSEO credits")
+                                elif "ChatGPT" in data["error"]:
+                                    st.info("• Check API configuration\n• Verify provider is accessible")
+
+                    st.info(f"👉 Go to **'My Clients'** tab to view full analysis for **{company_name}**")
+
+                else:
+                    status_posts.error(f"❌ **Error fetching posts**: {response.get('error')}")
+                    st.error("⛔ Onboarding stopped - cannot proceed without LinkedIn posts")
+                    st.caption("**Next steps:**")
+                    st.info("• Check RAPIDAPI_KEY in secrets\n• Verify LinkedIn URL is correct\n• Check RapidAPI subscription status")
 
     # ============================================================================
     # TAB 2: MY CLIENTS
@@ -186,7 +276,60 @@ def render_linkedin_app():
                 posts_analyzed = client.get('posts_analyzed', 0)
                 updated_at = client.get('updated_at', '')[:10] if client.get('updated_at') else 'N/A'
 
-                with st.expander(f"🏢 {company_name} - Last updated: {updated_at}", expanded=False):
+                # Calculate health status
+                data_checks = {
+                    "Posts": posts_analyzed > 0,
+                    "Voice": client.get('voice_profile', {}) and not client.get('voice_profile', {}).get('error'),
+                    "Strategy": client.get('content_pillars', {}) and not client.get('content_pillars', {}).get('error'),
+                    "Engagement": client.get('engagement_metrics', {}) and not client.get('engagement_metrics', {}).get('error'),
+                    "Keywords": client.get('ranked_keywords', {}) and not client.get('ranked_keywords', {}).get('error'),
+                    "AI Perception": client.get('ai_perception', {}) and not client.get('ai_perception', {}).get('error')
+                }
+
+                complete_count = sum(data_checks.values())
+                total_count = len(data_checks)
+                completion_pct = int((complete_count / total_count) * 100)
+
+                # Determine health status
+                if completion_pct == 100:
+                    health_emoji = "🟢"
+                    health_status = "Healthy"
+                    health_color = "#00C851"
+                elif completion_pct >= 50:
+                    health_emoji = "🟡"
+                    health_status = "Partial"
+                    health_color = "#FFB300"
+                else:
+                    health_emoji = "🔴"
+                    health_status = "Issues"
+                    health_color = "#FF4444"
+
+                # Expander with health status
+                with st.expander(f"{health_emoji} **{company_name}** - {completion_pct}% complete - Last updated: {updated_at}", expanded=False):
+                    # Health summary at the top
+                    st.markdown(f"### {health_emoji} Health Status: **{health_status}** ({complete_count}/{total_count} analyses)")
+
+                    # Show what's working and what's not
+                    col_status1, col_status2 = st.columns(2)
+                    with col_status1:
+                        st.markdown("**✅ Working:**")
+                        working = [name for name, status in data_checks.items() if status]
+                        if working:
+                            for item in working:
+                                st.markdown(f"• {item}")
+                        else:
+                            st.caption("Nothing working yet")
+
+                    with col_status2:
+                        st.markdown("**❌ Failed/Missing:**")
+                        failed = [name for name, status in data_checks.items() if not status]
+                        if failed:
+                            for item in failed:
+                                st.markdown(f"• {item}")
+                        else:
+                            st.caption("All analyses complete!")
+
+                    st.divider()
                     # Quick metrics
                     col1, col2, col3, col4 = st.columns(4)
                     with col1:
@@ -207,31 +350,148 @@ def render_linkedin_app():
                     st.divider()
 
                     # Action buttons
-                    btn_col1, btn_col2, btn_col3, btn_col4 = st.columns(4)
+                    if complete_count < total_count:
+                        # Show retry button if there are failures
+                        st.markdown("#### 🔄 Retry Failed Analyses")
+                        st.caption("Re-run only the analyses that failed without re-fetching LinkedIn posts")
+
+                        if st.button("🔄 Retry Failed Analyses", key=f"retry_{client.get('id')}", use_container_width=True, type="primary"):
+                            retry_status = st.empty()
+                            retry_status.info("Starting retry...")
+
+                            # Get existing posts from database
+                            posts = client.get('top_posts', [])  # We can use top posts or fetch from DB
+
+                            # Retry Voice if failed
+                            if not data_checks["Voice"]:
+                                retry_status.info("🔄 Retrying voice analysis...")
+                                from ai_analysis import analyze_company_voice
+                                voice_result = analyze_company_voice(posts, company_name, analysis_model)
+                                if not voice_result.get('error'):
+                                    retry_status.success("✅ Voice analysis succeeded!")
+                                else:
+                                    retry_status.error(f"❌ Voice still failing: {voice_result.get('error')}")
+
+                            # Retry Strategy if failed
+                            if not data_checks["Strategy"]:
+                                retry_status.info("🔄 Retrying strategy analysis...")
+                                from ai_analysis import analyze_content_strategy
+                                strategy_result = analyze_content_strategy(posts, company_name, analysis_model)
+                                if not strategy_result.get('error'):
+                                    retry_status.success("✅ Strategy analysis succeeded!")
+                                else:
+                                    retry_status.error(f"❌ Strategy still failing: {strategy_result.get('error')}")
+
+                            # Retry Engagement if failed
+                            if not data_checks["Engagement"]:
+                                retry_status.info("🔄 Retrying engagement analysis...")
+                                from ai_analysis import analyze_engagement_patterns
+                                engagement_result = analyze_engagement_patterns(posts, company_name, analysis_model)
+                                if not engagement_result.get('error'):
+                                    retry_status.success("✅ Engagement analysis succeeded!")
+                                else:
+                                    retry_status.error(f"❌ Engagement still failing: {engagement_result.get('error')}")
+
+                            # Retry Keywords if failed
+                            if not data_checks["Keywords"]:
+                                retry_status.info("🔄 Retrying keyword fetch...")
+                                domain = client.get('domain', '')
+                                if domain:
+                                    kw_result = get_ranked_keywords_for_domain(domain, limit=keyword_limit_default)
+                                    if not kw_result.get('error'):
+                                        update_company_ranked_keywords(company_url, kw_result, domain)
+                                        retry_status.success("✅ Keyword fetch succeeded!")
+                                    else:
+                                        retry_status.error(f"❌ Keywords still failing: {kw_result.get('error')}")
+
+                            # Retry AI Perception if failed
+                            if not data_checks["AI Perception"]:
+                                retry_status.info("🔄 Retrying AI perception...")
+                                ai_result = query_llm_about_company(company_name, client.get('domain', ''), "chatgpt")
+                                if not ai_result.get('error'):
+                                    update_company_ai_perception(company_url, ai_result)
+                                    retry_status.success("✅ AI perception succeeded!")
+                                else:
+                                    retry_status.error(f"❌ AI perception still failing: {ai_result.get('error')}")
+
+                            retry_status.success("🎉 Retry complete! Refreshing page...")
+                            time.sleep(2)
+                            st.rerun()
+
+                        st.divider()
+
+                    # Other action buttons
+                    btn_col1, btn_col2 = st.columns(2)
                     with btn_col1:
-                        if st.button("🔄 Refresh Data", key=f"refresh_{client.get('id')}", use_container_width=True):
-                            st.info("Refresh feature coming soon!")
-                    with btn_col2:
-                        if st.button("🤖 Ask AI", key=f"ask_ai_{client.get('id')}", use_container_width=True):
-                            st.info("Custom AI queries coming soon!")
-                    with btn_col3:
-                        if st.button("🔍 Update Keywords", key=f"update_kw_{client.get('id')}", use_container_width=True):
-                            st.info("Advanced keyword update coming soon!")
-                    with btn_col4:
-                        if st.button("🗑️ Delete", key=f"delete_{client.get('id')}", use_container_width=True, type="secondary"):
+                        if st.button("🗑️ Delete Client", key=f"delete_{client.get('id')}", use_container_width=True, type="secondary"):
                             if delete_company_analysis(company_url):
                                 st.success(f"Deleted {company_name}")
                                 time.sleep(1)
                                 st.rerun()
                             else:
                                 st.error("Failed to delete client")
+                    with btn_col2:
+                        if st.button("📥 Download JSON", key=f"download_{client.get('id')}", use_container_width=True):
+                            st.download_button(
+                                label="Download",
+                                data=str(client),
+                                file_name=f"{company_name}_analysis.json",
+                                mime="application/json"
+                            )
 
                     st.divider()
 
-                    # Display full 6-tab analysis
-                    client_tabs = st.tabs(["🎤 Voice", "📋 Strategy", "📈 Engagement", "🔝 Top Posts", "🔍 Keywords", "🔮 AI", "🔍 Debug"])
+                    # Display consolidated 5-tab analysis
+                    client_tabs = st.tabs(["📊 Overview", "🎤 Voice & Strategy", "📈 Content Performance", "🔍 Keywords & AI", "🐛 Debug"])
 
+                    # Tab 0: Overview
                     with client_tabs[0]:
+                        st.markdown("### 📊 Quick Overview")
+
+                        # Summary metrics row
+                        m1, m2, m3, m4 = st.columns(4)
+                        with m1:
+                            st.metric("Posts Analyzed", posts_analyzed)
+                        with m2:
+                            ranked_kw = client.get('ranked_keywords', {})
+                            kw_count = ranked_kw.get('count', 0) if not ranked_kw.get('error') else 0
+                            st.metric("Keywords", kw_count)
+                        with m3:
+                            engagement = client.get('engagement_metrics', {}).get('avg_engagement', {})
+                            avg_eng = engagement.get('total', 0)
+                            st.metric("Avg Engagement", f"{avg_eng:,}")
+                        with m4:
+                            ai_data = client.get('ai_perception', {})
+                            ai_count = len(ai_data.get('responses', [])) if not ai_data.get('error') else 0
+                            st.metric("AI Queries", ai_count)
+
+                        st.divider()
+
+                        # Quick voice summary
+                        voice = client.get('voice_profile', {})
+                        if voice and not voice.get('error'):
+                            st.markdown("#### 🎤 Voice Summary")
+                            vc1, vc2 = st.columns(2)
+                            with vc1:
+                                st.write(f"**Tone:** {voice.get('overall_tone', 'N/A')}")
+                                st.write(f"**Style:** {voice.get('writing_style', 'N/A')}")
+                            with vc2:
+                                st.write(f"**Formality:** {voice.get('formality_level', 'N/A')}")
+                                st.metric("Consistency", f"{voice.get('consistency_score', 0)}/10")
+
+                        # Quick strategy summary
+                        strategy = client.get('content_pillars', {})
+                        if strategy and not strategy.get('error'):
+                            st.markdown("#### 📋 Strategy Summary")
+                            st.write(f"**Primary Focus:** {strategy.get('primary_focus', 'N/A')}")
+
+                        # Date range
+                        date_range = client.get('date_range', 'Unknown')
+                        st.caption(f"📅 Analysis period: {date_range}")
+
+                    # Tab 1: Voice & Strategy (Combined)
+                    with client_tabs[1]:
+                        st.markdown("### 🎤 Voice Profile")
                         voice = client.get('voice_profile', {})
                         if voice and not voice.get('error'):
                             col1, col2 = st.columns(2)
@@ -241,32 +501,36 @@ def render_linkedin_app():
                                 st.write(f"**Formality:** {voice.get('formality_level', 'N/A')}")
                                 st.metric("Consistency", f"{voice.get('consistency_score', 0)}/10")
                             with col2:
-                                st.write("**Personality:**")
+                                st.write("**Personality Traits:**")
                                 for trait in voice.get('personality_traits', [])[:5]:
                                     st.write(f"• {trait}")
                             if voice.get('unique_voice_characteristics'):
-                                st.success(f"**Unique:** {voice['unique_voice_characteristics']}")
+                                st.success(f"**Unique Characteristics:** {voice['unique_voice_characteristics']}")
                         elif voice.get('error'):
                             st.error(f"Voice analysis failed: {voice.get('error')}")
-                            st.caption("This usually means the OpenRouter API call failed. Check your API key and credits.")
+                            st.caption("💡 This usually means the OpenRouter API call failed. Check your API key and credits.")
                         else:
                             st.info("No voice profile data available")
 
-                    with client_tabs[1]:
+                        st.divider()
+
+                        st.markdown("### 📋 Content Strategy")
                         strategy = client.get('content_pillars', {})
                         if strategy and not strategy.get('error'):
                             st.write(f"**Primary Focus:** {strategy.get('primary_focus', 'N/A')}")
                             if strategy.get('content_pillar_distribution'):
-                                st.write("**Content Distribution:**")
+                                st.write("**Content Pillar Distribution:**")
                                 for pillar, pct in sorted(strategy['content_pillar_distribution'].items(), key=lambda x: x[1], reverse=True)[:5]:
                                     st.progress(pct / 100, text=f"{pillar}: {pct}%")
                         elif strategy.get('error'):
                             st.error(f"Content strategy analysis failed: {strategy.get('error')}")
-                            st.caption("This usually means the OpenRouter API call failed. Check your API key and credits.")
+                            st.caption("💡 This usually means the OpenRouter API call failed. Check your API key and credits.")
                         else:
                             st.info("No content strategy data available")
 
+                    # Tab 2: Content Performance (Engagement + Top Posts)
                     with client_tabs[2]:
+                        st.markdown("### 📈 Engagement Metrics")
                         engagement_data = client.get('engagement_metrics', {})
                         if engagement_data and not engagement_data.get('error'):
                             avg_eng = engagement_data.get('avg_engagement', {})
@@ -278,21 +542,26 @@ def render_linkedin_app():
                                 c4.metric("Avg Total", f"{avg_eng.get('total', 0):,}")
                         elif engagement_data.get('error'):
                             st.error(f"Engagement analysis failed: {engagement_data.get('error')}")
-                            st.caption("This usually means the OpenRouter API call failed. Check your API key and credits.")
+                            st.caption("💡 This usually means the OpenRouter API call failed. Check your API key and credits.")
                         else:
                             st.info("No engagement data available")
 
-                    with client_tabs[3]:
+                        st.divider()
+
+                        st.markdown("### 🔝 Top Performing Posts")
                         top_posts = client.get('top_posts', [])
                         if top_posts:
                             for i, post in enumerate(top_posts, 1):
-                                st.write(f"**#{i}** - {post.get('engagement', 0):,} engagement")
-                                st.caption(post.get('text', '')[:200] + "...")
-                                st.markdown("---")
+                                with st.expander(f"**#{i}** - {post.get('engagement', 0):,} total engagement"):
+                                    st.write(post.get('text', ''))
+                                    if post.get('url'):
+                                        st.caption(f"[View on LinkedIn]({post.get('url')})")
                         else:
                             st.info("No top posts data")
 
-                    with client_tabs[4]:
+                    # Tab 3: Keywords & AI (Combined)
+                    with client_tabs[3]:
+                        st.markdown("### 🔍 Ranked Keywords")
                         ranked_kw = client.get('ranked_keywords', {})
                         if ranked_kw and not ranked_kw.get('error'):
                             keywords = ranked_kw.get('keywords', [])[:20]
@@ -304,29 +573,32 @@ def render_linkedin_app():
                                 st.info("Keywords fetched but no data returned")
                         elif ranked_kw.get('error'):
                             st.error(f"Keyword fetch failed: {ranked_kw.get('error')}")
-                            st.caption("This usually means the DataForSEO API call failed. Check your API key and credits.")
+                            st.caption("💡 This usually means the DataForSEO API call failed. Check your API key and credits.")
                         else:
                             st.info("No keyword data available - may not have been fetched during onboarding")
 
-                    with client_tabs[5]:
+                        st.divider()
+
+                        st.markdown("### 🔮 AI Perception")
                         ai_data = client.get('ai_perception', {})
                         if ai_data and not ai_data.get('error'):
                             responses = ai_data.get('responses', [])
                             if responses:
                                 for i, resp in enumerate(responses, 1):
                                     with st.expander(f"Q{i}: {resp.get('prompt', '')[:80]}..."):
-                                        st.write(f"**A:** {resp.get('response', '')}")
+                                        st.write(f"**Answer:** {resp.get('response', '')}")
                             else:
                                 st.info("AI perception fetched but no responses returned")
                         elif ai_data.get('error'):
                             st.error(f"AI perception query failed: {ai_data.get('error')}")
-                            st.caption("This usually means the ChatGPT API call failed. Check your API configuration.")
+                            st.caption("💡 This usually means the ChatGPT API call failed. Check your API configuration.")
                         else:
                             st.info("No AI perception data available - may not have been fetched during onboarding")
 
-                    with client_tabs[6]:
-                        st.markdown("### Raw Client Data")
-                        st.caption("Debug view - shows all data from database")
+                    # Tab 4: Debug
+                    with client_tabs[4]:
+                        st.markdown("### 🐛 Raw Client Data")
+                        st.caption("Debug view - shows all data from database. Use this to diagnose issues.")
                         st.json(client)
 
                     # Download button
