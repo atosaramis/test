@@ -142,6 +142,20 @@ def render_google_ads_app():
         if result and result.get("tasks"):
             task = result["tasks"][0]
 
+            # TEMPORARY DEBUG - show raw structure
+            st.info("🐛 DEBUG: API Response Structure")
+            st.write(f"Status Code: {result.get('status_code')}")
+            st.write(f"Tasks Count: {result.get('tasks_count')}")
+            st.write(f"Task Status: {task.get('status_code')} - {task.get('status_message')}")
+            st.write(f"Result Count: {task.get('result_count')}")
+            if task.get("result"):
+                st.write(f"Result Length: {len(task['result'])}")
+                if len(task['result']) > 0:
+                    st.write(f"First Result Keys: {list(task['result'][0].keys())}")
+                    st.write(f"Total Count: {task['result'][0].get('total_count')}")
+                    st.write(f"Items Count: {task['result'][0].get('items_count')}")
+            st.json(result)
+
             if task.get("result") and len(task["result"]) > 0:
                 ads_data = task["result"][0]
 

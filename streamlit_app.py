@@ -36,6 +36,8 @@ def check_password():
                 # Clear password from session state for security
                 del st.session_state["password"]
                 del st.session_state["username"]
+                # Clear query params to always start at dashboard after login
+                st.query_params.clear()
             else:
                 st.session_state.authenticated = False
 
