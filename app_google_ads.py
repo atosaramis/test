@@ -168,64 +168,63 @@ def render_google_ads_app():
                 if ads_data.get("items"):
                     st.markdown("### 📢 Google Ads Creatives")
 
-                    # TEMPORARY DEBUG - show first item structure
-                    if len(ads_data["items"]) > 0:
-                        st.info("🐛 DEBUG: First Ad Item Structure")
-                        st.json(ads_data["items"][0])
-
                     # Prepare data for display and export
                     ads_list = []
 
-                    for item in ads_data["items"]:
+                    for idx, item in enumerate(ads_data["items"]):
                         advertiser_id = item.get("advertiser_id", "")
                         creative_id = item.get("creative_id", "")
                         title = item.get("title", "No title")
                         url = item.get("url", "")
                         verified = item.get("verified", False)
                         ad_format = item.get("format", "text")
-                        preview_image_obj = item.get("preview_image", None)
+                        preview_url = item.get("preview_url", None)
                         first_shown = item.get("first_shown", "N/A")
                         last_shown = item.get("last_shown", "N/A")
 
-                        # Extract preview image URL if available
-                        preview_image_url = None
-                        if preview_image_obj and isinstance(preview_image_obj, dict):
-                            preview_image_url = preview_image_obj.get("url")
-
                         ads_list.append({
-                            "Title": title,
+                            "Advertiser": title,
                             "Format": ad_format,
-                            "URL": url,
-                            "Verified": "✓" if verified else "",
                             "First Shown": first_shown,
                             "Last Shown": last_shown,
+                            "Verified": "✓" if verified else "",
                             "Advertiser ID": advertiser_id,
                             "Creative ID": creative_id,
-                            "Preview Image URL": preview_image_url or ""
+                            "Transparency URL": url,
+                            "Preview URL": preview_url or ""
                         })
 
                         # Display individual ad card
                         with st.container():
-                            col_header1, col_header2 = st.columns([3, 1])
+                            # Header with advertiser name and verification badge
+                            col_header1, col_header2 = st.columns([4, 1])
                             with col_header1:
                                 st.markdown(f"### {title}")
+                                st.caption(f"Format: {ad_format} | Active: {first_shown[:10]} to {last_shown[:10]}")
                             with col_header2:
                                 if verified:
                                     st.markdown("✅ **Verified**")
 
-                            # Preview image (if available)
-                            if preview_image_url:
-                                st.image(preview_image_url, use_column_width=True)
+                            # Ad Preview (embedded iframe)
+                            if preview_url:
+                                st.markdown("**Ad Preview:**")
+                                # Embed the ad preview in an iframe
+                                iframe_html = f"""
+                                <iframe src="{preview_url}"
+                                        width="100%"
+                                        height="400"
+                                        frameborder="0"
+                                        sandbox="allow-scripts allow-same-origin"
+                                        style="border: 1px solid #ddd; border-radius: 8px;">
+                                </iframe>
+                                """
+                                st.markdown(iframe_html, unsafe_allow_html=True)
+                            else:
+                                st.info("No preview available for this ad.")
 
-                            # Ad details
-                            col_a, col_b = st.columns(2)
-                            with col_a:
-                                st.markdown(f"**Format:** {ad_format}")
-                                st.markdown(f"**First shown:** {first_shown}")
-                            with col_b:
-                                st.markdown(f"**Last shown:** {last_shown}")
-                                if url:
-                                    st.markdown(f"[View on Ads Transparency]({url})")
+                            # Link to full details
+                            if url:
+                                st.markdown(f"[🔗 View full details on Google Ads Transparency]({url})")
 
                             st.markdown("---")
 
