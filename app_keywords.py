@@ -31,12 +31,13 @@ def render_keywords_app():
 
         #### What You Can Research:
 
-        **1. Single Keyword Analysis**
-        - Get detailed metrics for a specific keyword
+        **1. Single or Multiple Keyword Analysis**
+        - Get detailed metrics for one or multiple keywords at once
+        - Enter keywords separated by commas or new lines
         - See search volume, cost-per-click, and competition data
 
         **2. Related Keywords (100 suggestions)**
-        - Discover up to 100 related keyword ideas
+        - Discover up to 100 related keyword ideas from any keyword
         - Find variations and long-tail opportunities
 
         **3. Competitor Keyword Analysis**
@@ -84,14 +85,17 @@ def render_keywords_app():
 
         ### How to Use This Tool
 
-        1. **Enter a keyword or competitor URL** above
+        1. **Enter keyword(s) or competitor URL** above
+           - Single: `biotech marketing`
+           - Multiple: `biotech marketing, pharma consulting, life sciences`
+           - One per line also works
         2. **Review the results** - All keywords are sorted by opportunity score by default
         3. **Apply filters** to narrow down keywords by volume, competition, or trend
         4. **Select keywords** using checkboxes to compare trends side-by-side
         5. **Download data** as CSV or JSON for further analysis
 
         **Pro Tip:** Start with broad keywords to discover related terms, then filter by opportunity score
-        to find the best keywords for your SEO strategy.
+        to find the best keywords for your SEO strategy. Use bulk search to compare multiple target keywords at once.
         """)
 
     # Initialize session state
@@ -109,9 +113,14 @@ def render_keywords_app():
 
     if input_method == "Search for keyword":
         with col1:
-            keyword_input = st.text_input("Enter keyword", placeholder="e.g., biotech marketing", label_visibility="collapsed")
+            keyword_input = st.text_area(
+                "Enter keyword(s)",
+                placeholder="e.g., biotech marketing\nOr multiple: biotech marketing, pharma consulting, life sciences",
+                label_visibility="collapsed",
+                height=100
+            )
         with col2:
-            get_suggestions = st.checkbox("Get 100 related keywords", value=False)
+            get_suggestions = st.checkbox("Get 100 related keywords (first keyword only)", value=False)
     else:
         with col1:
             url_input = st.text_input("Competitor URL", placeholder="e.g., competitor.com", label_visibility="collapsed")
@@ -131,21 +140,44 @@ def render_keywords_app():
                 all_keywords = []
 
                 if input_method == "Search for keyword":
-                    if get_suggestions:
-                        # Get suggestions
-                        response = get_keyword_suggestions(keyword_input, limit=100)
+                    # Parse multiple keywords (comma or newline separated)
+                    keywords_list = [kw.strip() for kw in keyword_input.replace('\n', ',').split(',') if kw.strip()]
+
+                    if not keywords_list:
+                        st.warning("Enter at least one keyword")
+                    elif get_suggestions:
+                        # Get suggestions for first keyword only
+                        st.info(f"Getting 100 related keywords for: {keywords_list[0]}")
+                        response = get_keyword_suggestions(keywords_list[0], limit=100)
                         if response.get("error"):
                             st.error(response['error'])
                         else:
                             all_keywords = response.get("keywords", [])
                             st.success(f"Found {len(all_keywords)} related keywords")
                     else:
-                        # Get single keyword data
-                        response = get_keyword_data(keyword_input)
-                        if response.get("error"):
-                            st.error(response['error'])
-                        else:
-                            all_keywords = [response.get("result", {})]
+                        # Get data for each keyword
+                        if len(keywords_list) > 1:
+                            st.info(f"Fetching data for {len(keywords_list)} keywords...")
+
+                        progress_bar = st.progress(0) if len(keywords_list) > 1 else None
+
+                        for idx, keyword in enumerate(keywords_list):
+                            response = get_keyword_data(keyword)
+                            if response.get("error"):
+                                st.warning(f"⚠️ Failed to get data for '{keyword}': {response['error']}")
+                            else:
+                                result = response.get("result", {})
+                                if result:
+                                    all_keywords.append(result)
+
+                            if progress_bar:
+                                progress_bar.progress((idx + 1) / len(keywords_list))
+
+                        if progress_bar:
+                            progress_bar.empty()
+
+                        if all_keywords:
+                            st.success(f"Successfully fetched data for {len(all_keywords)}/{len(keywords_list)} keywords")
 
                 else:  # Competitor URL
                     response = get_keywords_for_site(url_input, limit=100)
