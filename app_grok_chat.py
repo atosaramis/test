@@ -50,7 +50,7 @@ def chat_with_collection_sdk(collection_ids: List[str], user_message: str):
             ],
         )
 
-        chat.append(system("You are a helpful assistant with access to Samba Scientific's knowledge base. Answer questions accurately based on the retrieved documents."))
+        chat.append(system("You are a helpful assistant with access to Samba Scientific's website content. Answer questions accurately based on the retrieved documents."))
         chat.append(user(user_message))
 
         # Stream the response
@@ -79,7 +79,7 @@ def render_grok_chat_app():
     """Render the Samba Knowledge Chat interface."""
 
     st.markdown("## 🤖 Samba Knowledge Chat")
-    st.caption("Ask questions about Samba Scientific using AI-powered search")
+    st.caption("Chat with Samba Scientific's website using AI")
 
     # Get collection ID from secrets
     collection_id = get_credential("SAMBA_COLLECTION_ID")
@@ -139,7 +139,7 @@ def render_grok_chat_app():
             full_response = ""
             has_error = False
 
-            with st.spinner("🔍 Searching Samba Scientific knowledge base..."):
+            with st.spinner("🔍 Searching Samba Scientific's website..."):
                 for chunk in chat_with_collection_sdk([collection_id], user_input):
                     if chunk.get("error"):
                         st.error(f"❌ {chunk['error']}")

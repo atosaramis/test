@@ -217,7 +217,7 @@ Advanced SEO keyword research with search volume and competitor analysis"""
 
 **Samba Knowledge Chat**
 
-Chat with Samba Scientific knowledge base using AI"""
+Chat with Samba Scientific's website using AI"""
 
         st.button(app3_card, key="app3_btn", use_container_width=True, on_click=navigate_to_app, args=("grok_chat",))
 
