@@ -6,6 +6,27 @@ Simple chat interface for existing xAI collection using xAI SDK
 import streamlit as st
 import os
 from typing import List
+import re
+
+
+def clean_markdown_text(text: str) -> str:
+    """
+    Clean text to prevent unwanted markdown formatting issues.
+    Escapes underscores and asterisks in numeric contexts.
+    """
+    if not text:
+        return text
+
+    # Escape underscores and asterisks when they appear in numeric contexts
+    # Pattern: numbers, commas, slashes, parentheses with underscores/asterisks
+    text = re.sub(r'(\d+)_(\d+)', r'\1\_\2', text)  # 12_000 -> 12\_000
+    text = re.sub(r'(\d+)\*(\d+)', r'\1\*\2', text)  # 12*000 -> 12\*000
+
+    # Fix spacing issues in numeric patterns
+    text = re.sub(r'(\d+),(\d+)/(\w+)\((\d+)', r'\1,\2/\3 (\4', text)  # Add space before (
+    text = re.sub(r'\),with(\d+)', r'), with \1', text)  # Add space after "with"
+
+    return text
 
 
 def get_credential(key: str, default=None):
@@ -50,7 +71,20 @@ def chat_with_collection_sdk(collection_ids: List[str], user_message: str):
             ],
         )
 
-        chat.append(system("You are a helpful assistant with access to Samba Scientific's website content. Answer questions accurately based on the retrieved documents."))
+        chat.append(system("""You are a helpful assistant with access to Samba Scientific's website content.
+
+Answer questions accurately based on the retrieved documents.
+
+FORMATTING RULES:
+- Use **bold** for emphasis only when needed
+- Use bullet points (-, *, or numbered lists) for lists
+- Add clear paragraph breaks between sections
+- When writing numbers, prices, or measurements, use plain text WITHOUT underscores or special formatting
+- Write numbers like: $12,000/month (40 hours/month), with $6,000 minimum
+- NEVER use underscores in numbers (avoid: 12_000)
+- NEVER use asterisks in numbers (avoid: 12*000)
+- Avoid LaTeX notation, special characters, or complex formatting
+- Keep formatting clean and readable"""))
         chat.append(user(user_message))
 
         # Stream the response
@@ -151,17 +185,19 @@ def render_grok_chat_app():
                         response_placeholder.markdown(full_response + "▌")
 
             if not has_error:
-                # Final response
+                # Final response - clean before displaying
                 if full_response:
-                    response_placeholder.markdown(full_response)
+                    cleaned_response = clean_markdown_text(full_response)
+                    response_placeholder.markdown(cleaned_response)
                 else:
                     response_placeholder.warning("⚠️ No response generated.")
 
         # Add assistant message to history (only if we got a response)
         if not has_error and full_response:
+            cleaned_response = clean_markdown_text(full_response)
             st.session_state.grok_messages.append({
                 "role": "assistant",
-                "content": full_response
+                "content": cleaned_response
             })
 
             st.rerun()
