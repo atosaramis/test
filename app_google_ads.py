@@ -1,6 +1,6 @@
 """
 Google Ads Intelligence - Discover competitor ad creatives
-Analyzes Google Ads campaigns for any domain using DataForSEO Domain Analytics API
+Analyzes Google Ads campaigns for any domain using DataForSEO SERP API
 """
 
 import streamlit as st
@@ -22,12 +22,12 @@ def get_credential(key: str, default=None):
 
 def get_google_ads_data(domain: str, location_code: int = 2840, limit: int = 100) -> Optional[Dict[str, Any]]:
     """
-    Get Google Ads creatives for a domain using DataForSEO Domain Analytics API.
+    Get Google Ads creatives for a domain using DataForSEO SERP API.
 
     Args:
         domain: Domain name (e.g., "example.com")
         location_code: Location code (default: 2840 for United States)
-        limit: Number of results to return (default: 100)
+        limit: Number of results to return (default: 100, max: 120)
 
     Returns:
         dict: API response with Google Ads creatives or None if error
@@ -44,8 +44,8 @@ def get_google_ads_data(domain: str, location_code: int = 2840, limit: int = 100
     credentials = f"{login}:{password}"
     encoded_credentials = base64.b64encode(credentials.encode()).decode()
 
-    # API endpoint - Domain Analytics Google Ads Search
-    url = "https://api.dataforseo.com/v3/domain_analytics/google/ads/search/live"
+    # API endpoint - SERP API Google Ads Search
+    url = "https://api.dataforseo.com/v3/serp/google/ads_search/live/advanced"
 
     headers = {
         "Authorization": f"Basic {encoded_credentials}",
@@ -57,7 +57,7 @@ def get_google_ads_data(domain: str, location_code: int = 2840, limit: int = 100
             "target": domain,
             "location_code": location_code,
             "language_code": "en",
-            "depth": limit,
+            "depth": min(limit, 120),  # Max depth is 120
             "platform": "all",
             "format": "all"
         }
@@ -141,20 +141,6 @@ def render_google_ads_app():
 
         if result and result.get("tasks"):
             task = result["tasks"][0]
-
-            # TEMPORARY DEBUG - show raw structure
-            st.info("🐛 DEBUG: API Response Structure")
-            st.write(f"Status Code: {result.get('status_code')}")
-            st.write(f"Tasks Count: {result.get('tasks_count')}")
-            st.write(f"Task Status: {task.get('status_code')} - {task.get('status_message')}")
-            st.write(f"Result Count: {task.get('result_count')}")
-            if task.get("result"):
-                st.write(f"Result Length: {len(task['result'])}")
-                if len(task['result']) > 0:
-                    st.write(f"First Result Keys: {list(task['result'][0].keys())}")
-                    st.write(f"Total Count: {task['result'][0].get('total_count')}")
-                    st.write(f"Items Count: {task['result'][0].get('items_count')}")
-            st.json(result)
 
             if task.get("result") and len(task["result"]) > 0:
                 ads_data = task["result"][0]
