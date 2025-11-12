@@ -194,14 +194,7 @@ def render_dashboard():
 
 **LinkedIn Analysis**
 
-Complete LinkedIn intelligence platform for analyzing company presence and generating content
-
-**Features:**
-✓ Scrape and analyze 50+ LinkedIn posts
-✓ AI-powered voice & tone profiling
-✓ Content strategy analysis
-✓ Competitor comparison dashboard
-✓ Generate posts in client's voice"""
+Analyze company LinkedIn presence and generate content in their voice"""
 
         st.button(linkedin_card, key="linkedin_btn", use_container_width=True, on_click=navigate_to_app, args=("linkedin",))
 
@@ -210,14 +203,7 @@ Complete LinkedIn intelligence platform for analyzing company presence and gener
 
 **Keyword Research**
 
-Advanced SEO keyword research tool with competitor analysis and trend tracking
-
-**Features:**
-✓ Search volume & CPC data
-✓ 100+ related keyword suggestions
-✓ Competitor URL analysis
-✓ Opportunity scoring algorithm
-✓ 12-month trend visualization"""
+Advanced SEO keyword research with search volume and competitor analysis"""
 
         st.button(keywords_card, key="keywords_btn", use_container_width=True, on_click=navigate_to_app, args=("keywords",))
 
@@ -231,14 +217,7 @@ Advanced SEO keyword research tool with competitor analysis and trend tracking
 
 **Grok Collections Chat**
 
-Chat with Samba Scientific Knowledge Base
-
-**Features:**
-✓ RAG with xAI Collections
-✓ Semantic search documents
-✓ Citations & sources
-✓ Upload files to collections
-✓ Multi-collection search"""
+Chat with Samba Scientific knowledge base using AI"""
 
         st.button(app3_card, key="app3_btn", use_container_width=True, on_click=navigate_to_app, args=("grok_chat",))
 
@@ -247,14 +226,7 @@ Chat with Samba Scientific Knowledge Base
 
 **Content Planner**
 
-Coming Soon
-
-**Features:**
-✓ Content calendar
-✓ Topic research
-✓ Publishing scheduler
-✓ Campaign tracking
-✓ Team collaboration"""
+Coming Soon"""
 
         st.button(app4_card, key="app4_btn", use_container_width=True, on_click=navigate_to_app, args=("app4",))
 
