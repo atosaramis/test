@@ -224,20 +224,20 @@ Advanced SEO keyword research tool with competitor analysis and trend tracking
     col3, col4 = st.columns(2, gap="large")
 
     with col3:
-        app3_card = """📈
+        app3_card = """🤖
 
-**Analytics Dashboard**
+**Grok Collections Chat**
 
-Coming Soon
+Chat with Samba Scientific Knowledge Base
 
 **Features:**
-✓ Performance tracking
-✓ Custom reports
-✓ Data visualization
-✓ Export capabilities
-✓ Real-time insights"""
+✓ RAG with xAI Collections
+✓ Semantic search documents
+✓ Citations & sources
+✓ Upload files to collections
+✓ Multi-collection search"""
 
-        st.button(app3_card, key="app3_btn", use_container_width=True, on_click=navigate_to_app, args=("app3",))
+        st.button(app3_card, key="app3_btn", use_container_width=True, on_click=navigate_to_app, args=("grok_chat",))
 
     with col4:
         app4_card = """🎯
@@ -305,6 +305,8 @@ def render_app(app_name):
             st.info("📊 LinkedIn Analysis")
         elif app_name == "keywords":
             st.info("🔍 Keyword Research")
+        elif app_name == "grok_chat":
+            st.info("🤖 Grok Collections Chat")
 
     # Import and render the appropriate app
     if app_name == "linkedin":
@@ -314,6 +316,10 @@ def render_app(app_name):
     elif app_name == "keywords":
         from app_keywords import render_keywords_app
         render_keywords_app()
+
+    elif app_name == "grok_chat":
+        from app_grok_chat import render_grok_chat_app
+        render_grok_chat_app()
 
     else:
         st.error(f"Unknown app: {app_name}")
