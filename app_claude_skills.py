@@ -410,21 +410,6 @@ def render_claude_skills_app():
                 else:
                     output = None
 
-                # Debug output
-                with st.expander("🔍 Debug - View API Response"):
-                    st.json({
-                        "has_output": bool(output) if 'output' in locals() else False,
-                        "file_path": file_path,
-                        "has_text": bool(output_text),
-                        "container_id": container_id,
-                        "response_type": str(type(response)),
-                        "content_blocks": len(response.content) if hasattr(response, 'content') else 0
-                    })
-                    if file_path:
-                        st.write("**File Path in Container:**", file_path)
-                    if output_text:
-                        st.write("**Text Output:**", output_text[:500] + "..." if len(output_text) > 500 else output_text)
-
                 if output:
 
                     # Export options
@@ -537,21 +522,6 @@ def render_claude_skills_app():
                     st.markdown(output)
                 else:
                     output = None
-
-                # Debug output
-                with st.expander("🔍 Debug - View API Response"):
-                    st.json({
-                        "has_output": bool(output) if 'output' in locals() else False,
-                        "file_path": file_path,
-                        "has_text": bool(output_text),
-                        "container_id": container_id,
-                        "response_type": str(type(response)),
-                        "content_blocks": len(response.content) if hasattr(response, 'content') else 0
-                    })
-                    if file_path:
-                        st.write("**File Path in Container:**", file_path)
-                    if output_text:
-                        st.write("**Text Output:**", output_text[:500] + "..." if len(output_text) > 500 else output_text)
 
                 if output:
 
