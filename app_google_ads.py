@@ -163,9 +163,9 @@ def render_google_ads_app():
 
         # Scraping options
         scrape_enabled = st.checkbox(
-            "Scrape ad content",
+            "Scrape ad content (fallback)",
             value=False,
-            help="Use Firecrawl to extract actual ad text and images (slower, uses API credits)",
+            help="Use Firecrawl to extract text for ads without preview images (uses API credits)",
             disabled=not firecrawl_key
         )
 
@@ -175,7 +175,7 @@ def render_google_ads_app():
                 min_value=1,
                 max_value=20,
                 value=10,
-                help="Limit scraping to avoid excessive API usage"
+                help="Only scrapes ads without preview images"
             )
         else:
             scrape_limit = 0
@@ -254,13 +254,16 @@ def render_google_ads_app():
                         url = item.get("url", "")
                         verified = item.get("verified", False)
                         ad_format = item.get("format", "text")
-                        preview_url = item.get("preview_url", None)
                         first_shown = item.get("first_shown", "N/A")
                         last_shown = item.get("last_shown", "N/A")
 
-                        # Scrape ad content if enabled and within limit
+                        # Extract preview image URL
+                        preview_image_obj = item.get("preview_image", {})
+                        preview_image_url = preview_image_obj.get("url") if preview_image_obj else None
+
+                        # Only scrape if no preview image and scraping is enabled
                         scraped_content = None
-                        if scrape_enabled and scraped_count < scrape_limit and url:
+                        if not preview_image_url and scrape_enabled and scraped_count < scrape_limit and url:
                             scrape_status.text(f"Scraping ad {scraped_count + 1}/{scrape_limit}...")
                             scraped_content = scrape_ad_content(url)
                             scraped_count += 1
@@ -276,7 +279,8 @@ def render_google_ads_app():
                             "Advertiser ID": advertiser_id,
                             "Creative ID": creative_id,
                             "Transparency URL": url,
-                            "Preview URL": preview_url or "",
+                            "Preview Image URL": preview_image_url or "",
+                            "Has Preview": "Yes" if preview_image_url else "No",
                             "Scraped Content": "Yes" if scraped_content else "No"
                         })
 
@@ -291,8 +295,11 @@ def render_google_ads_app():
                                 if verified:
                                     st.markdown("✅ **Verified**")
 
-                            # Show scraped content if available
-                            if scraped_content:
+                            # Show ad content in priority order: preview image > scraped content > scraping prompt
+                            if preview_image_url:
+                                st.markdown("**🖼️ Ad Preview:**")
+                                st.image(preview_image_url, use_column_width=True)
+                            elif scraped_content:
                                 st.markdown("**📄 Ad Content:**")
                                 content_markdown = scraped_content.get("markdown", "")
                                 if content_markdown:
@@ -304,19 +311,6 @@ def render_google_ads_app():
                                     """, unsafe_allow_html=True)
                                 else:
                                     st.caption("Content extraction in progress...")
-                            elif preview_url:
-                                st.markdown("**Ad Preview:**")
-                                # Embed the ad preview in an iframe
-                                iframe_html = f"""
-                                <iframe src="{preview_url}"
-                                        width="100%"
-                                        height="400"
-                                        frameborder="0"
-                                        sandbox="allow-scripts allow-same-origin"
-                                        style="border: 1px solid #ddd; border-radius: 8px;">
-                                </iframe>
-                                """
-                                st.markdown(iframe_html, unsafe_allow_html=True)
                             else:
                                 st.info("💡 Enable 'Scrape ad content' in sidebar to extract actual ad text")
 
