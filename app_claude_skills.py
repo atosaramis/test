@@ -166,8 +166,12 @@ def read_file_from_container(file_path: str, container_id: str, model: str = "cl
 
     api_key = get_credential("ANTHROPIC_API_KEY")
 
+    # Store debug info in session state
+    if 'file_read_debug' not in st.session_state:
+        st.session_state.file_read_debug = []
+
     if not api_key:
-        st.error("❌ API key not found")
+        st.session_state.file_read_debug.append("❌ API key not found")
         return None
 
     try:
@@ -177,6 +181,7 @@ def read_file_from_container(file_path: str, container_id: str, model: str = "cl
 
         # Try reading file with retries (handles race conditions where file isn't fully written)
         for attempt in range(max_attempts):
+            st.session_state.file_read_debug.append(f"Attempt {attempt + 1}/{max_attempts}: Reading {file_path}")
             if attempt > 0:
                 # Add delay between retries (0.5s, 1s, 1.5s...)
                 time.sleep(0.5 * attempt)
@@ -205,46 +210,57 @@ def read_file_from_container(file_path: str, container_id: str, model: str = "cl
                 )
 
                 # Extract bash output
+                st.session_state.file_read_debug.append(f"  Response has {len(response.content)} blocks")
+
+                bash_result_found = False
                 for block in response.content:
+                    st.session_state.file_read_debug.append(f"    Block type: {block.type}")
+
                     if block.type == 'bash_code_execution_tool_result':
+                        bash_result_found = True
                         if hasattr(block, 'content'):
                             content = block.content
+                            st.session_state.file_read_debug.append(f"    Has content attr: {hasattr(content, 'stdout')}")
 
                             # Check for errors in bash execution
-                            if hasattr(content, 'return_code') and content.return_code != 0:
-                                error_msg = getattr(content, 'stderr', 'Unknown error')
-                                if attempt == max_attempts - 1:  # Last attempt
-                                    st.error(f"❌ Bash command failed (return code {content.return_code})")
-                                    st.error(f"stderr: {error_msg}")
-                                continue  # Try next attempt
+                            if hasattr(content, 'return_code'):
+                                st.session_state.file_read_debug.append(f"    Return code: {content.return_code}")
+                                if content.return_code != 0:
+                                    error_msg = getattr(content, 'stderr', 'Unknown error')
+                                    st.session_state.file_read_debug.append(f"    ❌ Bash failed: {error_msg}")
+                                    continue  # Try next attempt
 
                             # Content is a BetaBashCodeExecutionResultBlock object with stdout
                             if hasattr(content, 'stdout'):
                                 stdout = content.stdout
+                                stdout_len = len(stdout.strip()) if stdout else 0
+                                st.session_state.file_read_debug.append(f"    Stdout length: {stdout_len}")
+
                                 # Check if we got actual content (not empty)
-                                if stdout and len(stdout.strip()) > 0:
+                                if stdout and stdout_len > 0:
+                                    st.session_state.file_read_debug.append(f"    ✅ SUCCESS - Got content ({stdout_len} chars)")
                                     return stdout
-                                elif attempt == max_attempts - 1:  # Last attempt
-                                    st.warning(f"⚠️ File exists but appears empty: {file_path}")
+                                else:
+                                    st.session_state.file_read_debug.append(f"    ⚠️ Stdout is empty")
 
                             # Fallback for dict structure
                             elif isinstance(content, dict):
+                                st.session_state.file_read_debug.append(f"    Content is dict")
                                 result = content.get('content', [])
                                 if isinstance(result, list):
                                     for item in result:
                                         if isinstance(item, dict) and item.get('type') == 'text':
                                             text = item.get('text', '')
                                             if text and len(text.strip()) > 0:
+                                                st.session_state.file_read_debug.append(f"    ✅ SUCCESS - Got text from dict")
                                                 return text
                                 elif isinstance(result, str) and len(result.strip()) > 0:
+                                    st.session_state.file_read_debug.append(f"    ✅ SUCCESS - Got string result")
                                     return result
 
-                # If we didn't find content, log debug info on last attempt
-                if attempt == max_attempts - 1:
-                    st.error(f"❌ No bash_code_execution_tool_result found in response after {max_attempts} attempts")
-                    st.write(f"Response had {len(response.content)} blocks:")
-                    for i, block in enumerate(response.content):
-                        st.write(f"  Block {i}: {block.type}")
+                # If we didn't find bash result
+                if not bash_result_found:
+                    st.session_state.file_read_debug.append(f"  ❌ No bash_code_execution_tool_result found")
 
             except Exception as attempt_error:
                 if attempt == max_attempts - 1:  # Last attempt
@@ -381,7 +397,11 @@ def render_claude_skills_app():
                     # If skill created a file in the container, read it
                     if file_path and container_id:
                         with st.spinner("📥 Retrieving generated content from container..."):
+                            # Clear previous debug info
+                            st.session_state.file_read_debug = []
+
                             file_content = read_file_from_container(file_path, container_id, model)
+
                             if file_content:
                                 st.markdown(file_content)
 
@@ -395,6 +415,15 @@ def render_claude_skills_app():
                                 )
                             else:
                                 st.error(f"❌ Could not read file from container. File path: {file_path}")
+
+                                # Show detailed debug info
+                                with st.expander("🐛 File Reading Debug Log", expanded=True):
+                                    if 'file_read_debug' in st.session_state and st.session_state.file_read_debug:
+                                        for debug_line in st.session_state.file_read_debug:
+                                            st.text(debug_line)
+                                    else:
+                                        st.write("No debug info available")
+
                                 # Try to show any text output as fallback
                                 if output_text:
                                     st.info("Showing text output instead:")
