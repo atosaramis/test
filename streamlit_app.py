@@ -132,6 +132,12 @@ st.markdown("""
         color: white;
     }
 
+    /* Row 5 - Company Intelligence (teal) */
+    div[data-testid="column"]:nth-child(9) .stButton > button {
+        background: linear-gradient(135deg, #1fa2ff 0%, #12d8fa 100%);
+        color: white;
+    }
+
 
     /* Header styling */
     .dashboard-header {
@@ -284,6 +290,20 @@ Generate Samba blog posts and LinkedIn content from your text using AI"""
 
         st.button(app8_card, key="app8_btn", use_container_width=True, on_click=navigate_to_app, args=("claude_skills",))
 
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # App cards - Row 5
+    col9, col10 = st.columns(2, gap="large")
+
+    with col9:
+        app9_card = """🔍
+
+**Company Intelligence**
+
+Analyze any company's LinkedIn presence - voice, strategy, and engagement patterns"""
+
+        st.button(app9_card, key="app9_btn", use_container_width=True, on_click=navigate_to_app, args=("company_intel",))
+
     # Suggest Workflow Button
     st.markdown("<br><br>", unsafe_allow_html=True)
 
@@ -355,6 +375,8 @@ def render_app(app_name):
             st.info("📢 Google Ads Intelligence")
         elif app_name == "claude_skills":
             st.info("📝 Content Generator")
+        elif app_name == "company_intel":
+            st.info("🔍 Company Intelligence")
 
     # Import and render the appropriate app
     if app_name == "linkedin":
@@ -388,6 +410,10 @@ def render_app(app_name):
     elif app_name == "claude_skills":
         from app_claude_skills import render_claude_skills_app
         render_claude_skills_app()
+
+    elif app_name == "company_intel":
+        from app_company_intel import render_company_intel_app
+        render_company_intel_app()
 
     else:
         st.error(f"Unknown app: {app_name}")
