@@ -135,7 +135,7 @@ def render_company_research_app():
                 # ==============================================================
                 # STEP 1: GROK RESEARCH
                 # ==============================================================
-                with st.spinner("🤖 Grok: Running agentic web + X search... (this may take 30-60 seconds)"):
+                with st.spinner("🤖 Grok: Running agentic web + X search..."):
                     grok_result = run_grok_research(
                         company_url=company_url,
                         company_name=company_name,
@@ -155,7 +155,7 @@ def render_company_research_app():
                 # ==============================================================
                 # STEP 2: CLAUDE RESEARCH
                 # ==============================================================
-                with st.spinner("🔍 Claude: Running web fetch + search... (this may take 30-60 seconds)"):
+                with st.spinner("🔍 Claude: Running web fetch + search..."):
                     claude_result = run_claude_research(
                         company_url=company_url,
                         company_name=company_name,
@@ -215,6 +215,7 @@ def render_company_research_app():
                 # ==============================================================
                 if competitors:
                     st.markdown(f"### 🔍 Analyzing {len(competitors)} Competitor(s)")
+                    st.info(f"💡 Scraping and analyzing LinkedIn data for {len(competitors)} competitors...")
 
                     for idx, competitor_url in enumerate(competitors, 1):
                         with st.spinner(f"📊 Competitor {idx}/{len(competitors)}: Fetching LinkedIn posts..."):
@@ -268,7 +269,7 @@ def render_company_research_app():
                 # ==============================================================
                 # STEP 4: SYNTHESIS (from DB)
                 # ==============================================================
-                with st.spinner("🧠 Claude: Synthesizing all sources from database into final report... (this may take 60-90 seconds)"):
+                with st.spinner("🧠 Claude: Synthesizing all sources from database into final report..."):
                     final_report = synthesize_company_report(
                         company_name=company_name,
                         company_url=company_url,
@@ -339,7 +340,10 @@ def run_grok_research(company_url: str, company_name: str, competitors: list) ->
         # Build research prompt
         competitor_text = ""
         if competitors:
-            competitor_text = f"\n\nKey competitors to research:\n" + "\n".join(f"- {comp}" for comp in competitors)
+            # Filter out None/empty values
+            valid_competitors = [comp for comp in competitors if comp and str(comp).strip()]
+            if valid_competitors:
+                competitor_text = f"\n\nKey competitors to research:\n" + "\n".join(f"- {comp}" for comp in valid_competitors)
 
         research_prompt = f"""Research {company_name} ({company_url}) comprehensively.{competitor_text}
 
@@ -410,7 +414,10 @@ def run_claude_research(company_url: str, company_name: str, competitors: list) 
         # Build research prompt
         competitor_text = ""
         if competitors:
-            competitor_text = f"\n\nKey competitors to analyze:\n" + "\n".join(f"- {comp}" for comp in competitors)
+            # Filter out None/empty values
+            valid_competitors = [comp for comp in competitors if comp and str(comp).strip()]
+            if valid_competitors:
+                competitor_text = f"\n\nKey competitors to analyze:\n" + "\n".join(f"- {comp}" for comp in valid_competitors)
 
         research_prompt = f"""Research {company_name} ({company_url}) comprehensively using web fetch and web search.{competitor_text}
 
@@ -460,7 +467,7 @@ Provide a detailed analysis with citations."""
         for block in response.content:
             if hasattr(block, 'citations') and block.citations:
                 for citation in block.citations:
-                    if hasattr(citation, 'url'):
+                    if hasattr(citation, 'url') and citation.url:
                         citations.append(citation.url)
 
         total_tokens = response.usage.input_tokens + response.usage.output_tokens if hasattr(response, 'usage') else 0
@@ -643,7 +650,7 @@ Generate the complete report now."""
         # Call Claude for synthesis
         response = client.messages.create(
             model="claude-sonnet-4-5",
-            max_tokens=8000,
+            max_tokens=16000,
             messages=[{
                 "role": "user",
                 "content": synthesis_prompt
