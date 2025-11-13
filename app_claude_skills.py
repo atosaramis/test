@@ -334,57 +334,57 @@ def render_claude_skills_app():
 
             st.markdown("---")  # Separator between outputs
 
-    # LinkedIn Post Generation
-    if generate_linkedin and linkedin_skill_id:
-        st.markdown("### 💼 Generated LinkedIn Post")
+        # LinkedIn Post Generation
+        if generate_linkedin and linkedin_skill_id:
+            st.markdown("### 💼 Generated LinkedIn Post")
 
-        with st.spinner("🤖 Generating LinkedIn post..."):
-            response = execute_skill(linkedin_skill_id, content_input, model, max_tokens)
+            with st.spinner("🤖 Generating LinkedIn post..."):
+                response = execute_skill(linkedin_skill_id, content_input, model, max_tokens)
 
-            if response:
-                output_text, file_path = extract_text_from_response(response)
-                container_id = response.container.id if hasattr(response, 'container') else None
+                if response:
+                    output_text, file_path = extract_text_from_response(response)
+                    container_id = response.container.id if hasattr(response, 'container') else None
 
-                # If skill created a file in the container, read it
-                if file_path and container_id:
-                    with st.spinner("📥 Retrieving generated content from container..."):
-                        file_content = read_file_from_container(file_path, container_id, model)
-                        if file_content:
-                            st.markdown(file_content)
+                    # If skill created a file in the container, read it
+                    if file_path and container_id:
+                        with st.spinner("📥 Retrieving generated content from container..."):
+                            file_content = read_file_from_container(file_path, container_id, model)
+                            if file_content:
+                                st.markdown(file_content)
 
-                            st.download_button(
-                                label="💼 Download LinkedIn Post",
-                                data=file_content,
-                                file_name="samba_linkedin_post.txt",
-                                mime="text/plain",
-                                use_container_width=True,
-                                key="download_linkedin_file"
-                            )
-                        else:
-                            st.error(f"❌ Could not read file from container. File path: {file_path}")
-                            # Try to show any text output as fallback
-                            if output_text:
-                                st.info("Showing text output instead:")
-                                st.markdown(output_text)
                                 st.download_button(
                                     label="💼 Download LinkedIn Post",
-                                    data=output_text,
+                                    data=file_content,
                                     file_name="samba_linkedin_post.txt",
                                     mime="text/plain",
                                     use_container_width=True,
-                                    key="download_linkedin_text_fallback"
+                                    key="download_linkedin_file"
                                 )
-                # Otherwise use text output
-                elif output_text:
-                    st.markdown(output_text)
+                            else:
+                                st.error(f"❌ Could not read file from container. File path: {file_path}")
+                                # Try to show any text output as fallback
+                                if output_text:
+                                    st.info("Showing text output instead:")
+                                    st.markdown(output_text)
+                                    st.download_button(
+                                        label="💼 Download LinkedIn Post",
+                                        data=output_text,
+                                        file_name="samba_linkedin_post.txt",
+                                        mime="text/plain",
+                                        use_container_width=True,
+                                        key="download_linkedin_text_fallback"
+                                    )
+                    # Otherwise use text output
+                    elif output_text:
+                        st.markdown(output_text)
 
-                    st.download_button(
-                        label="💼 Download LinkedIn Post",
-                        data=output_text,
-                        file_name="samba_linkedin_post.txt",
-                        mime="text/plain",
-                        use_container_width=True,
-                        key="download_linkedin_text"
-                    )
-                else:
-                    st.warning("⚠️ No text output generated")
+                        st.download_button(
+                            label="💼 Download LinkedIn Post",
+                            data=output_text,
+                            file_name="samba_linkedin_post.txt",
+                            mime="text/plain",
+                            use_container_width=True,
+                            key="download_linkedin_text"
+                        )
+                    else:
+                        st.warning("⚠️ No text output generated")
