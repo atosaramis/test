@@ -809,9 +809,8 @@ def save_company_analysis(analysis_dict: Dict) -> bool:
 
     Args:
         analysis_dict: Complete analysis dict from analyze_company_complete()
-                      Must include: company_url, company_name, voice_profile,
-                      content_pillars, engagement_metrics, top_posts, etc.
-                      Optionally: ranked_keywords, ranked_keywords_domain, ai_perception
+                      For Company Research tool: linkedin_company_url, website_url, grok_research, claude_research
+                      For Company Intelligence tool: company_url, company_name, voice_profile, etc.
 
     Returns:
         True if successful, False otherwise
@@ -819,17 +818,27 @@ def save_company_analysis(analysis_dict: Dict) -> bool:
     try:
         supabase = get_supabase_client()
 
-        data = {
-            'company_url': analysis_dict.get('company_url'),
-            'company_name': analysis_dict.get('company_name'),
-            'voice_profile': json.dumps(analysis_dict.get('voice_profile', {})),
-            'content_pillars': json.dumps(analysis_dict.get('content_pillars', {})),
-            'engagement_metrics': json.dumps(analysis_dict.get('engagement_metrics', {})),
-            'top_posts': json.dumps(analysis_dict.get('top_posts', [])),
-            'posts_analyzed': analysis_dict.get('posts_analyzed'),
-            'date_range': analysis_dict.get('date_range'),
-            'analysis_model': analysis_dict.get('analysis_model')
-        }
+        data = {}
+
+        # Add fields based on what's provided in analysis_dict
+        if 'company_url' in analysis_dict:
+            data['company_url'] = analysis_dict.get('company_url')
+        if 'company_name' in analysis_dict:
+            data['company_name'] = analysis_dict.get('company_name')
+        if 'voice_profile' in analysis_dict:
+            data['voice_profile'] = json.dumps(analysis_dict.get('voice_profile', {}))
+        if 'content_pillars' in analysis_dict:
+            data['content_pillars'] = json.dumps(analysis_dict.get('content_pillars', {}))
+        if 'engagement_metrics' in analysis_dict:
+            data['engagement_metrics'] = json.dumps(analysis_dict.get('engagement_metrics', {}))
+        if 'top_posts' in analysis_dict:
+            data['top_posts'] = json.dumps(analysis_dict.get('top_posts', []))
+        if 'posts_analyzed' in analysis_dict:
+            data['posts_analyzed'] = analysis_dict.get('posts_analyzed')
+        if 'date_range' in analysis_dict:
+            data['date_range'] = analysis_dict.get('date_range')
+        if 'analysis_model' in analysis_dict:
+            data['analysis_model'] = analysis_dict.get('analysis_model')
 
         # Add new fields if present
         if 'ranked_keywords' in analysis_dict:
@@ -839,8 +848,35 @@ def save_company_analysis(analysis_dict: Dict) -> bool:
         if 'ai_perception' in analysis_dict:
             data['ai_perception'] = json.dumps(analysis_dict.get('ai_perception'))
 
-        # Use upsert to avoid duplicates (company_url is UNIQUE)
-        response = supabase.table('linkedin_company_analysis').upsert(data).execute()
+        # Add comprehensive research fields (Company Research tool)
+        if 'linkedin_company_url' in analysis_dict:
+            data['linkedin_company_url'] = analysis_dict.get('linkedin_company_url')
+        if 'website_url' in analysis_dict:
+            data['website_url'] = analysis_dict.get('website_url')
+        if 'grok_research' in analysis_dict:
+            data['grok_research'] = json.dumps(analysis_dict.get('grok_research'))
+        if 'claude_research' in analysis_dict:
+            data['claude_research'] = json.dumps(analysis_dict.get('claude_research'))
+        if 'competitor_of' in analysis_dict:
+            data['competitor_of'] = analysis_dict.get('competitor_of')
+        if 'research_type' in analysis_dict:
+            data['research_type'] = analysis_dict.get('research_type')
+
+        # Determine unique key - use linkedin_company_url if provided, otherwise company_url
+        if 'linkedin_company_url' in analysis_dict and analysis_dict.get('linkedin_company_url'):
+            # Company Research tool - upsert by linkedin_company_url
+            response = supabase.table('linkedin_company_analysis')\
+                .upsert(data, on_conflict='linkedin_company_url')\
+                .execute()
+        elif 'company_url' in analysis_dict and analysis_dict.get('company_url'):
+            # Company Intelligence tool - upsert by company_url
+            response = supabase.table('linkedin_company_analysis')\
+                .upsert(data, on_conflict='company_url')\
+                .execute()
+        else:
+            # No unique key provided, do regular insert
+            response = supabase.table('linkedin_company_analysis').insert(data).execute()
+
         return True
 
     except Exception as e:
@@ -916,12 +952,13 @@ def update_company_ai_perception(
         return False
 
 
-def get_company_analysis(company_url: str) -> Dict:
+def get_company_analysis(company_url: str = None, linkedin_company_url: str = None) -> Dict:
     """
     Retrieve company analysis by URL from Supabase.
 
     Args:
-        company_url: LinkedIn company URL
+        company_url: Company URL (for Company Intelligence tool)
+        linkedin_company_url: LinkedIn company URL (for Company Research tool)
 
     Returns:
         Dict with company analysis, or empty dict if not found
@@ -929,10 +966,19 @@ def get_company_analysis(company_url: str) -> Dict:
     try:
         supabase = get_supabase_client()
 
-        response = supabase.table('linkedin_company_analysis')\
-            .select('*')\
-            .eq('company_url', company_url)\
-            .execute()
+        # Query by linkedin_company_url if provided, otherwise by company_url
+        if linkedin_company_url:
+            response = supabase.table('linkedin_company_analysis')\
+                .select('*')\
+                .eq('linkedin_company_url', linkedin_company_url)\
+                .execute()
+        elif company_url:
+            response = supabase.table('linkedin_company_analysis')\
+                .select('*')\
+                .eq('company_url', company_url)\
+                .execute()
+        else:
+            return {}
 
         if not response.data or len(response.data) == 0:
             return {}
@@ -942,13 +988,15 @@ def get_company_analysis(company_url: str) -> Dict:
         result = {
             'id': item.get('id'),
             'company_url': item.get('company_url'),
+            'linkedin_company_url': item.get('linkedin_company_url'),
+            'website_url': item.get('website_url'),
             'company_name': item.get('company_name'),
-            'voice_profile': json.loads(item.get('voice_profile', '{}')),
-            'content_pillars': json.loads(item.get('content_pillars', '{}')),
-            'engagement_metrics': json.loads(item.get('engagement_metrics', '{}')),
-            'posting_strategy': json.loads(item.get('posting_strategy', '{}')),
-            'top_posts': json.loads(item.get('top_posts', '[]')),
-            'strategic_recommendations': json.loads(item.get('strategic_recommendations', '{}')),
+            'voice_profile': json.loads(item.get('voice_profile', '{}')) if item.get('voice_profile') else {},
+            'content_pillars': json.loads(item.get('content_pillars', '{}')) if item.get('content_pillars') else {},
+            'engagement_metrics': json.loads(item.get('engagement_metrics', '{}')) if item.get('engagement_metrics') else {},
+            'posting_strategy': json.loads(item.get('posting_strategy', '{}')) if item.get('posting_strategy') else {},
+            'top_posts': json.loads(item.get('top_posts', '[]')) if item.get('top_posts') else [],
+            'strategic_recommendations': json.loads(item.get('strategic_recommendations', '{}')) if item.get('strategic_recommendations') else {},
             'posts_analyzed': item.get('posts_analyzed'),
             'date_range': item.get('date_range'),
             'analysis_model': item.get('analysis_model'),
@@ -966,11 +1014,72 @@ def get_company_analysis(company_url: str) -> Dict:
         if item.get('ai_perception'):
             result['ai_perception'] = json.loads(item.get('ai_perception'))
 
+        # Add comprehensive research fields
+        if item.get('grok_research'):
+            result['grok_research'] = json.loads(item.get('grok_research'))
+        if item.get('claude_research'):
+            result['claude_research'] = json.loads(item.get('claude_research'))
+        if item.get('competitor_of'):
+            result['competitor_of'] = item.get('competitor_of')
+        if item.get('research_type'):
+            result['research_type'] = item.get('research_type')
+
         return result
 
     except Exception as e:
         print(f"Error retrieving company analysis from Supabase: {e}")
         return {}
+
+
+def get_company_competitors(main_company_url: str) -> List[Dict]:
+    """
+    Retrieve all competitor analyses for a given company from Supabase.
+
+    Args:
+        main_company_url: LinkedIn URL of the main company
+
+    Returns:
+        List of competitor analysis dicts, or empty list if none found
+    """
+    try:
+        supabase = get_supabase_client()
+
+        response = supabase.table('linkedin_company_analysis')\
+            .select('*')\
+            .eq('competitor_of', main_company_url)\
+            .eq('research_type', 'competitor')\
+            .execute()
+
+        if not response.data:
+            return []
+
+        competitors = []
+        for item in response.data:
+            result = {
+                'id': item.get('id'),
+                'company_url': item.get('company_url'),
+                'linkedin_company_url': item.get('linkedin_company_url'),
+                'website_url': item.get('website_url'),
+                'company_name': item.get('company_name'),
+                'voice_profile': json.loads(item.get('voice_profile', '{}')) if item.get('voice_profile') else {},
+                'content_pillars': json.loads(item.get('content_pillars', '{}')) if item.get('content_pillars') else {},
+                'engagement_metrics': json.loads(item.get('engagement_metrics', '{}')) if item.get('engagement_metrics') else {},
+                'top_posts': json.loads(item.get('top_posts', '[]')) if item.get('top_posts') else [],
+                'posts_analyzed': item.get('posts_analyzed'),
+                'date_range': item.get('date_range'),
+                'analysis_model': item.get('analysis_model'),
+                'competitor_of': item.get('competitor_of'),
+                'research_type': item.get('research_type'),
+                'created_at': item.get('created_at'),
+                'updated_at': item.get('updated_at')
+            }
+            competitors.append(result)
+
+        return competitors
+
+    except Exception as e:
+        print(f"Error retrieving competitors from Supabase: {e}")
+        return []
 
 
 def get_all_company_analyses(limit: int = 50) -> List[Dict]:

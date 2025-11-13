@@ -16,7 +16,15 @@ import json
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from seo_functions import fetch_linkedin_posts, get_credential
+from seo_functions import (
+    fetch_linkedin_posts,
+    get_credential,
+    save_company_analysis,
+    save_linkedin_posts_to_db,
+    get_company_analysis,
+    get_company_competitors
+)
+from ai_analysis import analyze_company_complete
 
 def render_company_research_app():
     """Main function to render the Company Research app."""
@@ -27,15 +35,9 @@ def render_company_research_app():
     # Initialize session state for storing research results
     if "research_results" not in st.session_state:
         st.session_state.research_results = None
-    if "grok_output" not in st.session_state:
-        st.session_state.grok_output = None
-    if "claude_output" not in st.session_state:
-        st.session_state.claude_output = None
-    if "linkedin_data" not in st.session_state:
-        st.session_state.linkedin_data = None
 
     # Create tabs
-    tab1, tab2, tab3 = st.tabs(["📝 Input & Research", "🔬 AI Search Outputs", "📊 Final Report"])
+    tab1, tab2 = st.tabs(["📝 Input & Research", "📊 Final Report"])
 
     # ========================================================================
     # TAB 1: INPUT & RESEARCH
@@ -118,6 +120,19 @@ def render_company_research_app():
                 st.success(f"✅ Starting multi-source research for **{company_name}**")
 
                 # ==============================================================
+                # STEP 0: CREATE INITIAL DATABASE RECORD
+                # ==============================================================
+                with st.spinner("💾 Initializing database record..."):
+                    save_company_analysis({
+                        'linkedin_company_url': linkedin_url,
+                        'website_url': company_url,
+                        'company_name': company_name,
+                        'research_type': 'primary',
+                        'competitor_of': None
+                    })
+                    st.success("✅ Database record created")
+
+                # ==============================================================
                 # STEP 1: GROK RESEARCH
                 # ==============================================================
                 with st.spinner("🤖 Grok: Running agentic web + X search... (this may take 30-60 seconds)"):
@@ -129,10 +144,13 @@ def render_company_research_app():
 
                 if grok_result.get("error"):
                     st.warning(f"⚠️ Grok search error: {grok_result['error']}")
-                    st.session_state.grok_output = {"error": grok_result["error"]}
                 else:
-                    st.session_state.grok_output = grok_result
-                    st.success(f"✅ Grok research complete ({grok_result.get('total_tokens', 0)} tokens)")
+                    # Save to DB immediately
+                    save_company_analysis({
+                        'linkedin_company_url': linkedin_url,
+                        'grok_research': grok_result
+                    })
+                    st.success(f"✅ Grok research complete and saved ({grok_result.get('total_tokens', 0)} tokens)")
 
                 # ==============================================================
                 # STEP 2: CLAUDE RESEARCH
@@ -146,10 +164,13 @@ def render_company_research_app():
 
                 if claude_result.get("error"):
                     st.warning(f"⚠️ Claude search error: {claude_result['error']}")
-                    st.session_state.claude_output = {"error": claude_result["error"]}
                 else:
-                    st.session_state.claude_output = claude_result
-                    st.success(f"✅ Claude research complete ({claude_result.get('total_tokens', 0)} tokens)")
+                    # Save to DB immediately
+                    save_company_analysis({
+                        'linkedin_company_url': linkedin_url,
+                        'claude_research': claude_result
+                    })
+                    st.success(f"✅ Claude research complete and saved ({claude_result.get('total_tokens', 0)} tokens)")
 
                 # ==============================================================
                 # STEP 3: LINKEDIN DATA
@@ -159,26 +180,99 @@ def render_company_research_app():
 
                 if linkedin_result.get("error"):
                     st.warning(f"⚠️ LinkedIn error: {linkedin_result['error']}")
-                    st.session_state.linkedin_data = {"error": linkedin_result["error"]}
                 else:
                     posts_data = linkedin_result.get("data", {}).get("data", [])
-                    st.session_state.linkedin_data = {
-                        "posts": posts_data,
-                        "count": len(posts_data)
-                    }
                     st.success(f"✅ LinkedIn data fetched ({len(posts_data)} posts)")
 
+                    # Save raw LinkedIn posts to DB
+                    save_linkedin_posts_to_db(linkedin_url, linkedin_result.get("raw_response", {}))
+
+                    # Run AI analysis on LinkedIn posts
+                    if posts_data:
+                        with st.spinner("🤖 Analyzing LinkedIn posts with AI..."):
+                            linkedin_analysis = analyze_company_complete(
+                                posts_data,
+                                company_name,
+                                linkedin_url,
+                                "anthropic/claude-haiku-4.5"
+                            )
+
+                            # Save LinkedIn analysis to DB immediately
+                            save_company_analysis({
+                                'linkedin_company_url': linkedin_url,
+                                'voice_profile': linkedin_analysis.get('voice_profile', {}),
+                                'content_pillars': linkedin_analysis.get('content_pillars', {}),
+                                'engagement_metrics': linkedin_analysis.get('engagement_metrics', {}),
+                                'top_posts': linkedin_analysis.get('top_posts', []),
+                                'posts_analyzed': linkedin_analysis.get('posts_analyzed', 0),
+                                'date_range': linkedin_analysis.get('date_range', ''),
+                                'analysis_model': linkedin_analysis.get('analysis_model', '')
+                            })
+                            st.success("✅ LinkedIn analysis complete and saved")
+
                 # ==============================================================
-                # STEP 4: SYNTHESIS
+                # STEP 3B: COMPETITOR LINKEDIN SCRAPING
                 # ==============================================================
-                with st.spinner("🧠 Claude: Synthesizing all sources into final report... (this may take 60-90 seconds)"):
+                if competitors:
+                    st.markdown(f"### 🔍 Analyzing {len(competitors)} Competitor(s)")
+
+                    for idx, competitor_url in enumerate(competitors, 1):
+                        with st.spinner(f"📊 Competitor {idx}/{len(competitors)}: Fetching LinkedIn posts..."):
+                            competitor_result = fetch_linkedin_posts(competitor_url)
+
+                        if competitor_result.get("error"):
+                            st.warning(f"⚠️ Competitor {idx} LinkedIn error: {competitor_result['error']}")
+                            continue
+
+                        # Extract competitor name from URL
+                        competitor_name = competitor_url.rstrip('/').split('/')[-1].replace('-', ' ').title()
+
+                        competitor_posts = competitor_result.get("data", {}).get("data", [])
+                        if not competitor_posts:
+                            st.warning(f"⚠️ No posts found for competitor {idx}")
+                            continue
+
+                        st.success(f"✅ Competitor {idx} ({competitor_name}): {len(competitor_posts)} posts fetched")
+
+                        # Save raw competitor posts to DB
+                        save_linkedin_posts_to_db(competitor_url, competitor_result.get("raw_response", {}))
+
+                        # Run AI analysis on competitor posts
+                        with st.spinner(f"🤖 Competitor {idx}: Analyzing with AI..."):
+                            competitor_analysis = analyze_company_complete(
+                                competitor_posts,
+                                competitor_name,
+                                competitor_url,
+                                "anthropic/claude-haiku-4.5"
+                            )
+
+                        # Save competitor analysis to DB
+                        competitor_data = {
+                            'linkedin_company_url': competitor_url,
+                            'company_name': competitor_name,
+                            'research_type': 'competitor',
+                            'competitor_of': linkedin_url,  # Reference to main company's linkedin_company_url
+                            'website_url': None,
+                            'voice_profile': competitor_analysis.get('voice_profile', {}),
+                            'content_pillars': competitor_analysis.get('content_pillars', {}),
+                            'engagement_metrics': competitor_analysis.get('engagement_metrics', {}),
+                            'top_posts': competitor_analysis.get('top_posts', []),
+                            'posts_analyzed': competitor_analysis.get('posts_analyzed', 0),
+                            'date_range': competitor_analysis.get('date_range', ''),
+                            'analysis_model': competitor_analysis.get('analysis_model', '')
+                        }
+
+                        save_company_analysis(competitor_data)
+                        st.success(f"✅ Competitor {idx} ({competitor_name}) saved to database")
+
+                # ==============================================================
+                # STEP 4: SYNTHESIS (from DB)
+                # ==============================================================
+                with st.spinner("🧠 Claude: Synthesizing all sources from database into final report... (this may take 60-90 seconds)"):
                     final_report = synthesize_company_report(
                         company_name=company_name,
                         company_url=company_url,
-                        grok_output=st.session_state.grok_output,
-                        claude_output=st.session_state.claude_output,
-                        linkedin_data=st.session_state.linkedin_data,
-                        competitors=competitors
+                        linkedin_url=linkedin_url
                     )
 
                 if final_report.get("error"):
@@ -188,81 +282,12 @@ def render_company_research_app():
                     st.success("✅ Company Intelligence Report complete!")
                     st.balloons()
 
-                    st.info("👉 View AI outputs in **'AI Search Outputs'** tab")
                     st.info("👉 View final report in **'Final Report'** tab")
 
     # ========================================================================
-    # TAB 2: AI SEARCH OUTPUTS
+    # TAB 2: FINAL REPORT
     # ========================================================================
     with tab2:
-        st.markdown("### Raw AI Search Outputs")
-        st.caption("Compare research from both AI agents")
-
-        if not st.session_state.grok_output and not st.session_state.claude_output:
-            st.info("📭 No research data yet. Start research in the 'Input & Research' tab.")
-        else:
-            # Grok Output
-            st.markdown("#### 🤖 Grok Research Output")
-            if st.session_state.grok_output:
-                if st.session_state.grok_output.get("error"):
-                    st.error(f"Error: {st.session_state.grok_output['error']}")
-                else:
-                    with st.expander("View Grok Research", expanded=True):
-                        st.markdown(st.session_state.grok_output.get("response", "No response"))
-
-                        if st.session_state.grok_output.get("citations"):
-                            st.markdown("**Citations:**")
-                            for citation in st.session_state.grok_output["citations"]:
-                                st.markdown(f"- {citation}")
-
-                        st.caption(f"Tokens used: {st.session_state.grok_output.get('total_tokens', 0)}")
-            else:
-                st.info("Grok research not yet run")
-
-            st.divider()
-
-            # Claude Output
-            st.markdown("#### 🔍 Claude Research Output")
-            if st.session_state.claude_output:
-                if st.session_state.claude_output.get("error"):
-                    st.error(f"Error: {st.session_state.claude_output['error']}")
-                else:
-                    with st.expander("View Claude Research", expanded=True):
-                        st.markdown(st.session_state.claude_output.get("response", "No response"))
-
-                        if st.session_state.claude_output.get("citations"):
-                            st.markdown("**Citations:**")
-                            for citation in st.session_state.claude_output["citations"]:
-                                st.markdown(f"- {citation}")
-
-                        st.caption(f"Tokens used: {st.session_state.claude_output.get('total_tokens', 0)}")
-            else:
-                st.info("Claude research not yet run")
-
-            st.divider()
-
-            # LinkedIn Data
-            st.markdown("#### 📊 LinkedIn Data")
-            if st.session_state.linkedin_data:
-                if st.session_state.linkedin_data.get("error"):
-                    st.error(f"Error: {st.session_state.linkedin_data['error']}")
-                else:
-                    st.metric("Posts Fetched", st.session_state.linkedin_data.get("count", 0))
-
-                    with st.expander("View LinkedIn Posts Sample"):
-                        posts = st.session_state.linkedin_data.get("posts", [])
-                        for i, post in enumerate(posts[:5], 1):
-                            st.markdown(f"**Post {i}:**")
-                            st.caption(post.get("text", "")[:200] + "...")
-                            st.markdown(f"Engagement: {post.get('likes', 0)} likes, {post.get('comments', 0)} comments")
-                            st.markdown("---")
-            else:
-                st.info("LinkedIn data not yet fetched")
-
-    # ========================================================================
-    # TAB 3: FINAL REPORT
-    # ========================================================================
-    with tab3:
         st.markdown("### Company Intelligence Report")
         st.caption("Synthesized analysis from all sources")
 
@@ -283,40 +308,6 @@ def render_company_research_app():
                     data=report.get("report", ""),
                     file_name=f"company_intelligence_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
                     mime="text/markdown",
-                    use_container_width=True
-                )
-
-                # JSON export - convert to serializable format
-                def make_serializable(obj):
-                    """Convert objects to JSON-serializable format."""
-                    if isinstance(obj, dict):
-                        return {k: make_serializable(v) for k, v in obj.items()}
-                    elif isinstance(obj, list):
-                        return [make_serializable(item) for item in obj]
-                    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes)):
-                        # Convert iterables (like protobuf RepeatedScalarContainer) to lists
-                        return [make_serializable(item) for item in obj]
-                    else:
-                        # Try to convert to string for non-serializable objects
-                        try:
-                            json.dumps(obj)
-                            return obj
-                        except (TypeError, ValueError):
-                            return str(obj)
-
-                export_data = {
-                    "generated_at": datetime.now().isoformat(),
-                    "grok_output": make_serializable(st.session_state.grok_output),
-                    "claude_output": make_serializable(st.session_state.claude_output),
-                    "linkedin_data": make_serializable(st.session_state.linkedin_data),
-                    "final_report": report.get("report", "")
-                }
-
-                st.download_button(
-                    label="📥 Download Full Data (JSON)",
-                    data=json.dumps(export_data, indent=2),
-                    file_name=f"company_research_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json",
                     use_container_width=True
                 )
 
@@ -488,13 +479,12 @@ Provide a detailed analysis with citations."""
 def synthesize_company_report(
     company_name: str,
     company_url: str,
-    grok_output: dict,
-    claude_output: dict,
-    linkedin_data: dict,
-    competitors: list
+    linkedin_url: str
 ) -> dict:
     """
-    Use Claude to synthesize all research sources into final report.
+    Use Claude to synthesize all research sources from DB into final report.
+
+    Queries database for main company and competitors, builds structured context.
 
     Returns:
         dict with 'report' (markdown) or 'error'
@@ -509,23 +499,97 @@ def synthesize_company_report(
 
         client = anthropic.Anthropic(api_key=anthropic_api_key)
 
+        # ==============================================================
+        # QUERY DATABASE FOR STRUCTURED DATA
+        # ==============================================================
+
+        # Get main company data
+        main_company = get_company_analysis(linkedin_company_url=linkedin_url)
+        if not main_company:
+            return {"error": "Main company data not found in database. Please run research first."}
+
+        # Get competitors
+        competitors = get_company_competitors(linkedin_url)
+
+        # ==============================================================
+        # BUILD STRUCTURED CONTEXT
+        # ==============================================================
+
+        # Grok Research Summary
+        grok_summary = "Not available"
+        if main_company.get('grok_research'):
+            grok_data = main_company['grok_research']
+            grok_summary = grok_data.get('response', 'No response')[:2000]  # First 2000 chars
+            if len(grok_data.get('response', '')) > 2000:
+                grok_summary += "... (truncated)"
+
+        # Claude Research Summary
+        claude_summary = "Not available"
+        if main_company.get('claude_research'):
+            claude_data = main_company['claude_research']
+            claude_summary = claude_data.get('response', 'No response')[:2000]  # First 2000 chars
+            if len(claude_data.get('response', '')) > 2000:
+                claude_summary += "... (truncated)"
+
+        # LinkedIn Analysis
+        voice_profile = main_company.get('voice_profile', {})
+        content_pillars = main_company.get('content_pillars', {})
+        engagement = main_company.get('engagement_metrics', {})
+
+        linkedin_summary = f"""
+**Voice Profile:**
+- Tone: {voice_profile.get('overall_tone', 'Unknown')}
+- Style: {voice_profile.get('writing_style', 'Unknown')}
+- Formality: {voice_profile.get('formality_level', 'Unknown')}
+- Consistency Score: {voice_profile.get('consistency_score', 0)}/10
+
+**Content Strategy:**
+- Primary Focus: {content_pillars.get('primary_focus', 'Unknown')}
+- Content Themes: {', '.join(content_pillars.get('content_themes', []))}
+- Pillar Distribution: {json.dumps(content_pillars.get('content_pillar_distribution', {}))}
+
+**Engagement:**
+- Avg Engagement: {engagement.get('avg_engagement', {}).get('total', 0)}
+- Posts Analyzed: {main_company.get('posts_analyzed', 0)}
+"""
+
+        # Competitor Comparison
+        competitor_summary = "No competitors analyzed."
+        if competitors:
+            competitor_summary = f"\n**{len(competitors)} Competitors Analyzed:**\n"
+            for comp in competitors:
+                comp_name = comp.get('company_name', 'Unknown')
+                comp_voice = comp.get('voice_profile', {})
+                comp_eng = comp.get('engagement_metrics', {})
+                competitor_summary += f"""
+- **{comp_name}**
+  - Voice: {comp_voice.get('overall_tone', 'Unknown')}
+  - Avg Engagement: {comp_eng.get('avg_engagement', {}).get('total', 0)}
+  - Posts: {comp.get('posts_analyzed', 0)}
+"""
+
         # Build synthesis prompt
         synthesis_prompt = f"""You are a strategic business analyst creating a comprehensive Company Intelligence Report.
 
 **Company:** {company_name}
 **Website:** {company_url}
-**Competitors:** {', '.join(competitors) if competitors else 'Not provided'}
+**LinkedIn:** {linkedin_url}
 
-You have been provided research from multiple AI agents and data sources. Synthesize ALL of this information into a comprehensive, well-structured Company Intelligence Report.
+You have structured research data from multiple AI sources and LinkedIn analysis. Synthesize this into a comprehensive intelligence report.
 
-**GROK RESEARCH OUTPUT:**
-{grok_output.get('response', 'Not available') if not grok_output.get('error') else f"Error: {grok_output.get('error')}"}
+---
 
-**CLAUDE RESEARCH OUTPUT:**
-{claude_output.get('response', 'Not available') if not claude_output.get('error') else f"Error: {claude_output.get('error')}"}
+**GROK RESEARCH (Web + X Search):**
+{grok_summary}
 
-**LINKEDIN DATA:**
-{f"{linkedin_data.get('count', 0)} posts fetched" if not linkedin_data.get('error') else f"Error: {linkedin_data.get('error')}"}
+**CLAUDE RESEARCH (Web Fetch + Search):**
+{claude_summary}
+
+**LINKEDIN ANALYSIS:**
+{linkedin_summary}
+
+**COMPETITOR ANALYSIS:**
+{competitor_summary}
 
 ---
 
