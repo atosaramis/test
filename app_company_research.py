@@ -117,55 +117,48 @@ def render_company_research_app():
 
                 st.success(f"✅ Starting multi-source research for **{company_name}**")
 
-                # Create progress container
-                progress = st.empty()
-                results_container = st.empty()
-
                 # ==============================================================
                 # STEP 1: GROK RESEARCH
                 # ==============================================================
-                progress.info("🤖 Grok: Starting agentic web + X search...")
-
-                grok_result = run_grok_research(
-                    company_url=company_url,
-                    company_name=company_name,
-                    competitors=competitors
-                )
+                with st.spinner("🤖 Grok: Running agentic web + X search... (this may take 30-60 seconds)"):
+                    grok_result = run_grok_research(
+                        company_url=company_url,
+                        company_name=company_name,
+                        competitors=competitors
+                    )
 
                 if grok_result.get("error"):
-                    results_container.warning(f"⚠️ Grok search error: {grok_result['error']}")
+                    st.warning(f"⚠️ Grok search error: {grok_result['error']}")
                     st.session_state.grok_output = {"error": grok_result["error"]}
                 else:
                     st.session_state.grok_output = grok_result
-                    results_container.success(f"✅ Grok research complete ({grok_result.get('total_tokens', 0)} tokens)")
+                    st.success(f"✅ Grok research complete ({grok_result.get('total_tokens', 0)} tokens)")
 
                 # ==============================================================
                 # STEP 2: CLAUDE RESEARCH
                 # ==============================================================
-                progress.info("🔍 Claude: Web fetch + search in progress...")
-
-                claude_result = run_claude_research(
-                    company_url=company_url,
-                    company_name=company_name,
-                    competitors=competitors
-                )
+                with st.spinner("🔍 Claude: Running web fetch + search... (this may take 30-60 seconds)"):
+                    claude_result = run_claude_research(
+                        company_url=company_url,
+                        company_name=company_name,
+                        competitors=competitors
+                    )
 
                 if claude_result.get("error"):
-                    results_container.warning(f"⚠️ Claude search error: {claude_result['error']}")
+                    st.warning(f"⚠️ Claude search error: {claude_result['error']}")
                     st.session_state.claude_output = {"error": claude_result["error"]}
                 else:
                     st.session_state.claude_output = claude_result
-                    results_container.success(f"✅ Claude research complete ({claude_result.get('total_tokens', 0)} tokens)")
+                    st.success(f"✅ Claude research complete ({claude_result.get('total_tokens', 0)} tokens)")
 
                 # ==============================================================
                 # STEP 3: LINKEDIN DATA
                 # ==============================================================
-                progress.info("📊 Fetching LinkedIn posts...")
-
-                linkedin_result = fetch_linkedin_posts(linkedin_url)
+                with st.spinner("📊 Fetching LinkedIn posts via RapidAPI..."):
+                    linkedin_result = fetch_linkedin_posts(linkedin_url)
 
                 if linkedin_result.get("error"):
-                    results_container.warning(f"⚠️ LinkedIn error: {linkedin_result['error']}")
+                    st.warning(f"⚠️ LinkedIn error: {linkedin_result['error']}")
                     st.session_state.linkedin_data = {"error": linkedin_result["error"]}
                 else:
                     posts_data = linkedin_result.get("data", {}).get("data", [])
@@ -173,28 +166,26 @@ def render_company_research_app():
                         "posts": posts_data,
                         "count": len(posts_data)
                     }
-                    results_container.success(f"✅ LinkedIn data fetched ({len(posts_data)} posts)")
+                    st.success(f"✅ LinkedIn data fetched ({len(posts_data)} posts)")
 
                 # ==============================================================
                 # STEP 4: SYNTHESIS
                 # ==============================================================
-                progress.info("🧠 Claude: Synthesizing all sources into final report...")
-
-                final_report = synthesize_company_report(
-                    company_name=company_name,
-                    company_url=company_url,
-                    grok_output=st.session_state.grok_output,
-                    claude_output=st.session_state.claude_output,
-                    linkedin_data=st.session_state.linkedin_data,
-                    competitors=competitors
-                )
+                with st.spinner("🧠 Claude: Synthesizing all sources into final report... (this may take 60-90 seconds)"):
+                    final_report = synthesize_company_report(
+                        company_name=company_name,
+                        company_url=company_url,
+                        grok_output=st.session_state.grok_output,
+                        claude_output=st.session_state.claude_output,
+                        linkedin_data=st.session_state.linkedin_data,
+                        competitors=competitors
+                    )
 
                 if final_report.get("error"):
-                    results_container.error(f"❌ Synthesis failed: {final_report['error']}")
+                    st.error(f"❌ Synthesis failed: {final_report['error']}")
                 else:
                     st.session_state.research_results = final_report
-                    progress.empty()
-                    results_container.success("✅ Company Intelligence Report complete!")
+                    st.success("✅ Company Intelligence Report complete!")
                     st.balloons()
 
                     st.info("👉 View AI outputs in **'AI Search Outputs'** tab")
