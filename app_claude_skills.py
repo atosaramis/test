@@ -82,14 +82,15 @@ def execute_skill(skill_id: str, content: str, model: str = "claude-sonnet-4-5-2
 def extract_text_from_response(response) -> tuple:
     """
     Extract text content and file paths from API response using multiple detection methods.
-    Returns: (text_content, file_path_in_container, detection_method)
+    Returns: (text_content, file_path_in_container, detection_method, file_content_from_response)
     """
     if not response or not hasattr(response, 'content'):
-        return "", None, None
+        return "", None, None, None
 
     text_parts = []
     file_path = None
     detection_method = None
+    file_content_from_response = None
 
     # Collect all text content first
     for block in response.content:
@@ -99,6 +100,16 @@ def extract_text_from_response(response) -> tuple:
             text_parts.append(block.text if hasattr(block, 'text') else str(block))
 
     text_content = "\n".join(text_parts)
+
+    # Check if the response ALREADY contains file content from bash execution
+    # (LinkedIn skill does this, blog skill doesn't)
+    for block in response.content:
+        if block.type == 'bash_code_execution_tool_result':
+            if hasattr(block, 'content') and hasattr(block.content, 'stdout'):
+                stdout = block.content.stdout
+                if stdout and len(stdout.strip()) > 100:  # Only if substantial content
+                    file_content_from_response = stdout
+                    break
 
     # Method 1: Look for file creation in server_tool_use blocks (text_editor create)
     for block in response.content:
@@ -146,7 +157,7 @@ def extract_text_from_response(response) -> tuple:
                         detection_method = "bash:redirect"
                         break
 
-    return text_content, file_path, detection_method
+    return text_content, file_path, detection_method, file_content_from_response
 
 
 def read_file_from_container(file_path: str, container_id: str, model: str = "claude-sonnet-4-5-20250929", max_attempts: int = 3) -> Optional[str]:
@@ -390,7 +401,7 @@ def render_claude_skills_app():
                 response = execute_skill(blog_skill_id, content_input, model, max_tokens)
 
                 if response:
-                    output_text, file_path, detection_method = extract_text_from_response(response)
+                    output_text, file_path, detection_method, file_content_from_response = extract_text_from_response(response)
                     container_id = response.container.id if hasattr(response, 'container') else None
 
                     # Debug info
@@ -398,13 +409,27 @@ def render_claude_skills_app():
                         st.write(f"**File Path Detected:** {file_path}")
                         st.write(f"**Detection Method:** {detection_method}")
                         st.write(f"**Container ID:** {container_id}")
+                        st.write(f"**File Content in Response:** {'Yes' if file_content_from_response else 'No'}")
                         st.write(f"**Text Output Length:** {len(output_text)} chars")
                         st.write(f"**Response Blocks:** {len(response.content)}")
                         for i, block in enumerate(response.content):
                             st.write(f"  Block {i}: {block.type}")
 
-                    # If skill created a file in the container, read it
-                    if file_path and container_id:
+                    # Check if file content was already in the response (LinkedIn style)
+                    if file_content_from_response:
+                        st.markdown(file_content_from_response)
+
+                        st.download_button(
+                            label="📄 Download Blog Post",
+                            data=file_content_from_response,
+                            file_name="samba_blog_post.txt",
+                            mime="text/plain",
+                            use_container_width=True,
+                            key="download_blog_from_response"
+                        )
+
+                    # Otherwise, try to read file from container (blog style)
+                    elif file_path and container_id:
                         with st.spinner("📥 Retrieving generated content from container..."):
                             # Clear previous debug info
                             st.session_state.file_read_debug = []
@@ -470,7 +495,7 @@ def render_claude_skills_app():
                 response = execute_skill(linkedin_skill_id, content_input, model, max_tokens)
 
                 if response:
-                    output_text, file_path, detection_method = extract_text_from_response(response)
+                    output_text, file_path, detection_method, file_content_from_response = extract_text_from_response(response)
                     container_id = response.container.id if hasattr(response, 'container') else None
 
                     # Debug info
@@ -478,13 +503,27 @@ def render_claude_skills_app():
                         st.write(f"**File Path Detected:** {file_path}")
                         st.write(f"**Detection Method:** {detection_method}")
                         st.write(f"**Container ID:** {container_id}")
+                        st.write(f"**File Content in Response:** {'Yes' if file_content_from_response else 'No'}")
                         st.write(f"**Text Output Length:** {len(output_text)} chars")
                         st.write(f"**Response Blocks:** {len(response.content)}")
                         for i, block in enumerate(response.content):
                             st.write(f"  Block {i}: {block.type}")
 
-                    # If skill created a file in the container, read it
-                    if file_path and container_id:
+                    # Check if file content was already in the response (LinkedIn style)
+                    if file_content_from_response:
+                        st.markdown(file_content_from_response)
+
+                        st.download_button(
+                            label="💼 Download LinkedIn Post",
+                            data=file_content_from_response,
+                            file_name="samba_linkedin_post.txt",
+                            mime="text/plain",
+                            use_container_width=True,
+                            key="download_linkedin_from_response"
+                        )
+
+                    # Otherwise, try to read file from container (blog style)
+                    elif file_path and container_id:
                         with st.spinner("📥 Retrieving generated content from container..."):
                             # Clear previous debug info
                             st.session_state.file_read_debug = []
