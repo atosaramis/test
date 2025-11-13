@@ -138,6 +138,12 @@ st.markdown("""
         color: white;
     }
 
+    /* Row 5 - Company Research (indigo) */
+    div[data-testid="column"]:nth-child(10) .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
 
     /* Header styling */
     .dashboard-header {
@@ -304,6 +310,15 @@ Analyze any company's LinkedIn presence - voice, strategy, and engagement patter
 
         st.button(app9_card, key="app9_btn", use_container_width=True, on_click=navigate_to_app, args=("company_intel",))
 
+    with col10:
+        app10_card = """🔬
+
+**Company Research**
+
+Multi-source AI research combining Grok, Claude, and LinkedIn for comprehensive company intelligence"""
+
+        st.button(app10_card, key="app10_btn", use_container_width=True, on_click=navigate_to_app, args=("company_research",))
+
     # Suggest Workflow Button
     st.markdown("<br><br>", unsafe_allow_html=True)
 
@@ -377,6 +392,8 @@ def render_app(app_name):
             st.info("📝 Content Generator")
         elif app_name == "company_intel":
             st.info("🔍 Company Intelligence")
+        elif app_name == "company_research":
+            st.info("🔬 Company Research")
 
     # Import and render the appropriate app
     if app_name == "linkedin":
@@ -414,6 +431,10 @@ def render_app(app_name):
     elif app_name == "company_intel":
         from app_company_intel import render_company_intel_app
         render_company_intel_app()
+
+    elif app_name == "company_research":
+        from app_company_research import render_company_research_app
+        render_company_research_app()
 
     else:
         st.error(f"Unknown app: {app_name}")
