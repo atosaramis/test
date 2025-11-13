@@ -286,12 +286,29 @@ def render_company_research_app():
                     use_container_width=True
                 )
 
-                # JSON export
+                # JSON export - convert to serializable format
+                def make_serializable(obj):
+                    """Convert objects to JSON-serializable format."""
+                    if isinstance(obj, dict):
+                        return {k: make_serializable(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [make_serializable(item) for item in obj]
+                    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes)):
+                        # Convert iterables (like protobuf RepeatedScalarContainer) to lists
+                        return [make_serializable(item) for item in obj]
+                    else:
+                        # Try to convert to string for non-serializable objects
+                        try:
+                            json.dumps(obj)
+                            return obj
+                        except (TypeError, ValueError):
+                            return str(obj)
+
                 export_data = {
                     "generated_at": datetime.now().isoformat(),
-                    "grok_output": st.session_state.grok_output,
-                    "claude_output": st.session_state.claude_output,
-                    "linkedin_data": st.session_state.linkedin_data,
+                    "grok_output": make_serializable(st.session_state.grok_output),
+                    "claude_output": make_serializable(st.session_state.claude_output),
+                    "linkedin_data": make_serializable(st.session_state.linkedin_data),
                     "final_report": report.get("report", "")
                 }
 
