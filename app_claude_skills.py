@@ -209,15 +209,23 @@ def read_file_from_container(file_path: str, container_id: str, model: str = "cl
                     ]
                 )
 
-                # Extract bash output
+                # Extract bash output - ONLY from the FIRST bash result (ignore Claude's helpful follow-ups)
                 st.session_state.file_read_debug.append(f"  Response has {len(response.content)} blocks")
 
-                bash_result_found = False
+                bash_result_count = 0
                 for block in response.content:
                     st.session_state.file_read_debug.append(f"    Block type: {block.type}")
 
                     if block.type == 'bash_code_execution_tool_result':
-                        bash_result_found = True
+                        bash_result_count += 1
+                        st.session_state.file_read_debug.append(f"    Bash result #{bash_result_count}")
+
+                        # ONLY process the FIRST bash result (from our cat command)
+                        # Ignore subsequent results (Claude's helpful ls commands)
+                        if bash_result_count > 1:
+                            st.session_state.file_read_debug.append(f"    ⚠️ Skipping - not the first bash result (likely Claude's helpful debugging)")
+                            continue
+
                         if hasattr(block, 'content'):
                             content = block.content
                             st.session_state.file_read_debug.append(f"    Has content attr: {hasattr(content, 'stdout')}")
@@ -228,7 +236,8 @@ def read_file_from_container(file_path: str, container_id: str, model: str = "cl
                                 if content.return_code != 0:
                                     error_msg = getattr(content, 'stderr', 'Unknown error')
                                     st.session_state.file_read_debug.append(f"    ❌ Bash failed: {error_msg}")
-                                    continue  # Try next attempt
+                                    # Don't return - let retry logic handle it
+                                    break  # Exit loop to retry
 
                             # Content is a BetaBashCodeExecutionResultBlock object with stdout
                             if hasattr(content, 'stdout'):
@@ -258,8 +267,8 @@ def read_file_from_container(file_path: str, container_id: str, model: str = "cl
                                     st.session_state.file_read_debug.append(f"    ✅ SUCCESS - Got string result")
                                     return result
 
-                # If we didn't find bash result
-                if not bash_result_found:
+                # If we didn't find valid bash result
+                if bash_result_count == 0:
                     st.session_state.file_read_debug.append(f"  ❌ No bash_code_execution_tool_result found")
 
             except Exception as attempt_error:
