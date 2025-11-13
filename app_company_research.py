@@ -461,7 +461,7 @@ Provide a detailed analysis with citations."""
         # Extract response text
         response_text = ""
         for block in response.content:
-            if hasattr(block, 'text'):
+            if hasattr(block, 'text') and block.text is not None:
                 response_text += block.text
 
         # Extract citations
@@ -589,7 +589,7 @@ Generate the complete report now."""
         # Extract report text
         report_text = ""
         for block in response.content:
-            if hasattr(block, 'text'):
+            if hasattr(block, 'text') and block.text is not None:
                 report_text += block.text
 
         return {
