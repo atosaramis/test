@@ -81,49 +81,93 @@ def execute_skill(skill_id: str, content: str, model: str = "claude-sonnet-4-5-2
 
 def extract_text_from_response(response) -> tuple:
     """
-    Extract text content and file paths from API response.
-    Returns: (text_content, file_path_in_container)
+    Extract text content and file paths from API response using multiple detection methods.
+    Returns: (text_content, file_path_in_container, detection_method)
     """
     if not response or not hasattr(response, 'content'):
-        return "", None
+        return "", None, None
 
     text_parts = []
     file_path = None
+    detection_method = None
 
+    # Collect all text content first
     for block in response.content:
-        # Look for file creation in server_tool_use blocks
-        if block.type == 'server_tool_use':
-            if hasattr(block, 'input'):
-                input_data = block.input
-                # Check for text_editor create command
-                if isinstance(input_data, dict):
-                    if input_data.get('command') == 'create' and input_data.get('path'):
-                        file_path = input_data.get('path')
-
-        # Extract text content
         if hasattr(block, 'text'):
             text_parts.append(block.text)
         elif block.type == 'text':
             text_parts.append(block.text if hasattr(block, 'text') else str(block))
 
-    return "\n".join(text_parts), file_path
+    text_content = "\n".join(text_parts)
+
+    # Method 1: Look for file creation in server_tool_use blocks (text_editor create)
+    for block in response.content:
+        if block.type == 'server_tool_use':
+            if hasattr(block, 'input'):
+                input_data = block.input
+                if isinstance(input_data, dict):
+                    if input_data.get('command') == 'create' and input_data.get('path'):
+                        file_path = input_data.get('path')
+                        detection_method = "server_tool_use:text_editor:create"
+                        break
+
+    # Method 2: Check tool_use blocks for file paths
+    if not file_path:
+        for block in response.content:
+            if block.type == 'tool_use':
+                if hasattr(block, 'input'):
+                    input_data = block.input
+                    if isinstance(input_data, dict) and 'path' in input_data:
+                        file_path = input_data['path']
+                        detection_method = "tool_use:path"
+                        break
+
+    # Method 3: Search for /tmp/ file paths in text output using regex
+    if not file_path:
+        import re
+        # Look for patterns like /tmp/filename.md or /tmp/filename-name.md
+        matches = re.findall(r'/tmp/[a-zA-Z0-9_\-]+\.md', text_content)
+        if matches:
+            file_path = matches[0]  # Use first match
+            detection_method = "regex:text_content"
+
+    # Method 4: Check bash execution inputs for file creation
+    if not file_path:
+        for block in response.content:
+            if block.type == 'tool_use' and hasattr(block, 'input'):
+                input_data = block.input
+                if isinstance(input_data, dict) and 'command' in input_data:
+                    command = input_data['command']
+                    # Look for output redirection in bash commands
+                    import re
+                    redirect_match = re.search(r'>\s*(/tmp/[a-zA-Z0-9_\-]+\.md)', str(command))
+                    if redirect_match:
+                        file_path = redirect_match.group(1)
+                        detection_method = "bash:redirect"
+                        break
+
+    return text_content, file_path, detection_method
 
 
-def read_file_from_container(file_path: str, container_id: str, model: str = "claude-sonnet-4-5-20250929") -> Optional[str]:
+def read_file_from_container(file_path: str, container_id: str, model: str = "claude-sonnet-4-5-20250929", max_attempts: int = 3) -> Optional[str]:
     """
-    Read file content from container filesystem using bash.
+    Read file content from container filesystem using bash with retry logic.
 
     Args:
         file_path: Path to file in container (e.g., /tmp/output.md)
         container_id: Container ID to reuse
         model: Claude model to use
+        max_attempts: Maximum number of retry attempts (default: 3)
 
     Returns:
         File content as string or None if error
     """
+    import time
+
     api_key = get_credential("ANTHROPIC_API_KEY")
 
     if not api_key:
+        st.error("❌ API key not found")
         return None
 
     try:
@@ -131,45 +175,81 @@ def read_file_from_container(file_path: str, container_id: str, model: str = "cl
 
         client = anthropic.Anthropic(api_key=api_key)
 
-        # Use bash to read the file
-        response = client.beta.messages.create(
-            model=model,
-            max_tokens=4096,
-            betas=["code-execution-2025-08-25", "skills-2025-10-02"],
-            container={
-                "id": container_id  # Reuse same container
-            },
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"cat {file_path}"
-                }
-            ],
-            tools=[
-                {
-                    "type": "code_execution_20250825",
-                    "name": "code_execution"
-                }
-            ]
-        )
+        # Try reading file with retries (handles race conditions where file isn't fully written)
+        for attempt in range(max_attempts):
+            if attempt > 0:
+                # Add delay between retries (0.5s, 1s, 1.5s...)
+                time.sleep(0.5 * attempt)
 
-        # Extract bash output
-        for block in response.content:
-            if block.type == 'bash_code_execution_tool_result':
-                if hasattr(block, 'content'):
-                    content = block.content
-                    # Content is a BetaBashCodeExecutionResultBlock object with stdout
-                    if hasattr(content, 'stdout'):
-                        return content.stdout
-                    # Fallback for dict structure
-                    elif isinstance(content, dict):
-                        result = content.get('content', [])
-                        if isinstance(result, list):
-                            for item in result:
-                                if isinstance(item, dict) and item.get('type') == 'text':
-                                    return item.get('text', '')
-                        elif isinstance(result, str):
-                            return result
+            try:
+                # Use bash to read the file
+                response = client.beta.messages.create(
+                    model=model,
+                    max_tokens=4096,
+                    betas=["code-execution-2025-08-25", "skills-2025-10-02"],
+                    container={
+                        "id": container_id  # Reuse same container
+                    },
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"cat {file_path}"
+                        }
+                    ],
+                    tools=[
+                        {
+                            "type": "code_execution_20250825",
+                            "name": "code_execution"
+                        }
+                    ]
+                )
+
+                # Extract bash output
+                for block in response.content:
+                    if block.type == 'bash_code_execution_tool_result':
+                        if hasattr(block, 'content'):
+                            content = block.content
+
+                            # Check for errors in bash execution
+                            if hasattr(content, 'return_code') and content.return_code != 0:
+                                error_msg = getattr(content, 'stderr', 'Unknown error')
+                                if attempt == max_attempts - 1:  # Last attempt
+                                    st.error(f"❌ Bash command failed (return code {content.return_code})")
+                                    st.error(f"stderr: {error_msg}")
+                                continue  # Try next attempt
+
+                            # Content is a BetaBashCodeExecutionResultBlock object with stdout
+                            if hasattr(content, 'stdout'):
+                                stdout = content.stdout
+                                # Check if we got actual content (not empty)
+                                if stdout and len(stdout.strip()) > 0:
+                                    return stdout
+                                elif attempt == max_attempts - 1:  # Last attempt
+                                    st.warning(f"⚠️ File exists but appears empty: {file_path}")
+
+                            # Fallback for dict structure
+                            elif isinstance(content, dict):
+                                result = content.get('content', [])
+                                if isinstance(result, list):
+                                    for item in result:
+                                        if isinstance(item, dict) and item.get('type') == 'text':
+                                            text = item.get('text', '')
+                                            if text and len(text.strip()) > 0:
+                                                return text
+                                elif isinstance(result, str) and len(result.strip()) > 0:
+                                    return result
+
+                # If we didn't find content, log debug info on last attempt
+                if attempt == max_attempts - 1:
+                    st.error(f"❌ No bash_code_execution_tool_result found in response after {max_attempts} attempts")
+                    st.write(f"Response had {len(response.content)} blocks:")
+                    for i, block in enumerate(response.content):
+                        st.write(f"  Block {i}: {block.type}")
+
+            except Exception as attempt_error:
+                if attempt == max_attempts - 1:  # Last attempt
+                    st.error(f"❌ Attempt {attempt + 1}/{max_attempts} failed: {str(attempt_error)}")
+                    raise
 
         return None
 
@@ -285,8 +365,18 @@ def render_claude_skills_app():
                 response = execute_skill(blog_skill_id, content_input, model, max_tokens)
 
                 if response:
-                    output_text, file_path = extract_text_from_response(response)
+                    output_text, file_path, detection_method = extract_text_from_response(response)
                     container_id = response.container.id if hasattr(response, 'container') else None
+
+                    # Debug info
+                    with st.expander("🔍 Debug Info", expanded=False):
+                        st.write(f"**File Path Detected:** {file_path}")
+                        st.write(f"**Detection Method:** {detection_method}")
+                        st.write(f"**Container ID:** {container_id}")
+                        st.write(f"**Text Output Length:** {len(output_text)} chars")
+                        st.write(f"**Response Blocks:** {len(response.content)}")
+                        for i, block in enumerate(response.content):
+                            st.write(f"  Block {i}: {block.type}")
 
                     # If skill created a file in the container, read it
                     if file_path and container_id:
@@ -342,8 +432,18 @@ def render_claude_skills_app():
                 response = execute_skill(linkedin_skill_id, content_input, model, max_tokens)
 
                 if response:
-                    output_text, file_path = extract_text_from_response(response)
+                    output_text, file_path, detection_method = extract_text_from_response(response)
                     container_id = response.container.id if hasattr(response, 'container') else None
+
+                    # Debug info
+                    with st.expander("🔍 Debug Info", expanded=False):
+                        st.write(f"**File Path Detected:** {file_path}")
+                        st.write(f"**Detection Method:** {detection_method}")
+                        st.write(f"**Container ID:** {container_id}")
+                        st.write(f"**Text Output Length:** {len(output_text)} chars")
+                        st.write(f"**Response Blocks:** {len(response.content)}")
+                        for i, block in enumerate(response.content):
+                            st.write(f"  Block {i}: {block.type}")
 
                     # If skill created a file in the container, read it
                     if file_path and container_id:
