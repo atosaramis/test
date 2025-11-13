@@ -402,6 +402,14 @@ def render_claude_skills_app():
 
                             file_content = read_file_from_container(file_path, container_id, model)
 
+                            # ALWAYS show debug log
+                            with st.expander("🐛 File Reading Debug Log", expanded=False):
+                                if 'file_read_debug' in st.session_state and st.session_state.file_read_debug:
+                                    for debug_line in st.session_state.file_read_debug:
+                                        st.text(debug_line)
+                                else:
+                                    st.write("No debug info available")
+
                             if file_content:
                                 st.markdown(file_content)
 
@@ -415,14 +423,6 @@ def render_claude_skills_app():
                                 )
                             else:
                                 st.error(f"❌ Could not read file from container. File path: {file_path}")
-
-                                # Show detailed debug info
-                                with st.expander("🐛 File Reading Debug Log", expanded=True):
-                                    if 'file_read_debug' in st.session_state and st.session_state.file_read_debug:
-                                        for debug_line in st.session_state.file_read_debug:
-                                            st.text(debug_line)
-                                    else:
-                                        st.write("No debug info available")
 
                                 # Try to show any text output as fallback
                                 if output_text:
@@ -477,7 +477,19 @@ def render_claude_skills_app():
                     # If skill created a file in the container, read it
                     if file_path and container_id:
                         with st.spinner("📥 Retrieving generated content from container..."):
+                            # Clear previous debug info
+                            st.session_state.file_read_debug = []
+
                             file_content = read_file_from_container(file_path, container_id, model)
+
+                            # ALWAYS show debug log
+                            with st.expander("🐛 File Reading Debug Log", expanded=False):
+                                if 'file_read_debug' in st.session_state and st.session_state.file_read_debug:
+                                    for debug_line in st.session_state.file_read_debug:
+                                        st.text(debug_line)
+                                else:
+                                    st.write("No debug info available")
+
                             if file_content:
                                 st.markdown(file_content)
 
