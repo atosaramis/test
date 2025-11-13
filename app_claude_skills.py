@@ -264,17 +264,17 @@ def render_claude_skills_app():
             help="Generate a LinkedIn post"
         )
 
-    # Single generate button
+    # Single generate button with key to prevent auto-trigger
     st.markdown("")
-    generate_button = st.button(
+
+    # Only generate if button is explicitly clicked (not on checkbox changes)
+    if st.button(
         "✨ Generate Content",
         type="primary",
         use_container_width=True,
-        disabled=not content_input or (not generate_blog and not generate_linkedin)
-    )
-
-    # Handle generation
-    if generate_button and content_input:
+        disabled=not content_input or (not generate_blog and not generate_linkedin),
+        key="generate_content_button"
+    ) and content_input:
         st.markdown("---")
 
         # Generate blog post
@@ -295,29 +295,39 @@ def render_claude_skills_app():
                             if file_content:
                                 st.markdown(file_content)
 
-                                # Download button
                                 st.download_button(
                                     label="📄 Download Blog Post",
                                     data=file_content,
                                     file_name="samba_blog_post.txt",
                                     mime="text/plain",
                                     use_container_width=True,
-                                    key="download_blog"
+                                    key="download_blog_file"
                                 )
                             else:
-                                st.error("❌ Could not read file from container")
+                                st.error(f"❌ Could not read file from container. File path: {file_path}")
+                                # Try to show any text output as fallback
+                                if output_text:
+                                    st.info("Showing text output instead:")
+                                    st.markdown(output_text)
+                                    st.download_button(
+                                        label="📄 Download Blog Post",
+                                        data=output_text,
+                                        file_name="samba_blog_post.txt",
+                                        mime="text/plain",
+                                        use_container_width=True,
+                                        key="download_blog_text_fallback"
+                                    )
                     # Otherwise use text output
                     elif output_text:
                         st.markdown(output_text)
 
-                        # Download button
                         st.download_button(
                             label="📄 Download Blog Post",
                             data=output_text,
                             file_name="samba_blog_post.txt",
                             mime="text/plain",
                             use_container_width=True,
-                            key="download_blog"
+                            key="download_blog_text"
                         )
                     else:
                         st.warning("⚠️ No text output generated")
@@ -348,10 +358,22 @@ def render_claude_skills_app():
                                 file_name="samba_linkedin_post.txt",
                                 mime="text/plain",
                                 use_container_width=True,
-                                key="download_linkedin"
+                                key="download_linkedin_file"
                             )
                         else:
-                            st.error("❌ Could not read file from container")
+                            st.error(f"❌ Could not read file from container. File path: {file_path}")
+                            # Try to show any text output as fallback
+                            if output_text:
+                                st.info("Showing text output instead:")
+                                st.markdown(output_text)
+                                st.download_button(
+                                    label="💼 Download LinkedIn Post",
+                                    data=output_text,
+                                    file_name="samba_linkedin_post.txt",
+                                    mime="text/plain",
+                                    use_container_width=True,
+                                    key="download_linkedin_text_fallback"
+                                )
                 # Otherwise use text output
                 elif output_text:
                     st.markdown(output_text)
@@ -362,7 +384,7 @@ def render_claude_skills_app():
                         file_name="samba_linkedin_post.txt",
                         mime="text/plain",
                         use_container_width=True,
-                        key="download_linkedin"
+                        key="download_linkedin_text"
                     )
                 else:
                     st.warning("⚠️ No text output generated")
