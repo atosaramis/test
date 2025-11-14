@@ -866,26 +866,54 @@ def save_company_analysis(analysis_dict: Dict) -> bool:
         if 'linkedin_company_url' in analysis_dict and analysis_dict.get('linkedin_company_url'):
             # Company Research tool - check if record exists, then update or insert
             linkedin_url = analysis_dict.get('linkedin_company_url')
-            print(f"[DB] Checking for existing record with linkedin_company_url: {linkedin_url}")
+            print(f"[DB SAVE] linkedin_company_url = '{linkedin_url}'")
+            print(f"[DB SAVE] Fields to save: {list(data.keys())}")
+            print(f"[DB SAVE] Querying for existing record...")
+
             existing = supabase.table('linkedin_company_analysis')\
-                .select('id')\
+                .select('id, linkedin_company_url')\
                 .eq('linkedin_company_url', linkedin_url)\
                 .execute()
+
+            print(f"[DB SAVE] Query returned {len(existing.data) if existing.data else 0} records")
+            if existing.data:
+                print(f"[DB SAVE] Existing record data: {existing.data}")
 
             if existing.data and len(existing.data) > 0:
                 # Update existing record
                 record_id = existing.data[0]['id']
-                print(f"[DB] Found existing record ID {record_id}, updating with fields: {list(data.keys())}")
+                print(f"[DB SAVE] Updating existing record ID {record_id}")
                 response = supabase.table('linkedin_company_analysis')\
                     .update(data)\
                     .eq('id', record_id)\
                     .execute()
-                print(f"[DB] Update successful")
+                print(f"[DB SAVE] Update response: {len(response.data) if response.data else 0} records affected")
+
+                # Verify the update
+                verify = supabase.table('linkedin_company_analysis')\
+                    .select('id, linkedin_company_url')\
+                    .eq('id', record_id)\
+                    .execute()
+                print(f"[DB SAVE] Verification: Record still exists with linkedin_company_url = '{verify.data[0].get('linkedin_company_url') if verify.data else 'NOT FOUND'}'")
             else:
                 # Insert new record
-                print(f"[DB] No existing record found, inserting new with fields: {list(data.keys())}")
+                print(f"[DB SAVE] Inserting new record")
                 response = supabase.table('linkedin_company_analysis').insert(data).execute()
-                print(f"[DB] Insert successful, new record created")
+                print(f"[DB SAVE] Insert response: {response.data if response.data else 'NO DATA'}")
+
+                if response.data and len(response.data) > 0:
+                    new_id = response.data[0].get('id')
+                    print(f"[DB SAVE] New record created with ID {new_id}")
+
+                    # Immediately verify we can query it back
+                    verify = supabase.table('linkedin_company_analysis')\
+                        .select('id, linkedin_company_url')\
+                        .eq('linkedin_company_url', linkedin_url)\
+                        .execute()
+                    print(f"[DB SAVE] Verification: Can query back {len(verify.data) if verify.data else 0} records with this linkedin_company_url")
+                else:
+                    print(f"[DB SAVE] WARNING: Insert returned no data - operation may have failed silently")
+                    return False
 
         elif 'company_url' in analysis_dict and analysis_dict.get('company_url'):
             # Company Intelligence tool - upsert by company_url (assumes unique constraint exists)
@@ -987,25 +1015,39 @@ def get_company_analysis(company_url: str = None, linkedin_company_url: str = No
 
         # Query by linkedin_company_url if provided, otherwise by company_url
         if linkedin_company_url:
-            print(f"[GET] Querying by linkedin_company_url: {linkedin_company_url}")
+            print(f"[DB GET] Querying by linkedin_company_url = '{linkedin_company_url}'")
             response = supabase.table('linkedin_company_analysis')\
                 .select('*')\
                 .eq('linkedin_company_url', linkedin_company_url)\
                 .execute()
-            print(f"[GET] Query returned {len(response.data) if response.data else 0} records")
+            print(f"[DB GET] Query returned {len(response.data) if response.data else 0} records")
+            if response.data and len(response.data) > 0:
+                print(f"[DB GET] Found record with ID {response.data[0].get('id')}")
+                print(f"[DB GET] Record linkedin_company_url = '{response.data[0].get('linkedin_company_url')}'")
+            else:
+                print(f"[DB GET] No matching records found")
+                # Debug: Try to see ALL records in the table
+                all_records = supabase.table('linkedin_company_analysis')\
+                    .select('id, linkedin_company_url, company_name')\
+                    .limit(10)\
+                    .execute()
+                print(f"[DB GET] DEBUG: Total records in table (first 10): {len(all_records.data) if all_records.data else 0}")
+                if all_records.data:
+                    for rec in all_records.data:
+                        print(f"[DB GET] DEBUG:   - ID {rec.get('id')}: linkedin_company_url = '{rec.get('linkedin_company_url')}', company_name = '{rec.get('company_name')}'")
         elif company_url:
-            print(f"[GET] Querying by company_url: {company_url}")
+            print(f"[DB GET] Querying by company_url = '{company_url}'")
             response = supabase.table('linkedin_company_analysis')\
                 .select('*')\
                 .eq('company_url', company_url)\
                 .execute()
-            print(f"[GET] Query returned {len(response.data) if response.data else 0} records")
+            print(f"[DB GET] Query returned {len(response.data) if response.data else 0} records")
         else:
-            print(f"[GET] No URL provided, returning empty")
+            print(f"[DB GET] No URL provided, returning empty")
             return {}
 
         if not response.data or len(response.data) == 0:
-            print(f"[GET] No data found, returning empty dict")
+            print(f"[DB GET] No data found, returning empty dict")
             return {}
 
         item = response.data[0]
