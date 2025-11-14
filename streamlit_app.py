@@ -299,18 +299,9 @@ Generate Samba blog posts and LinkedIn content from your text using AI"""
     st.markdown("<br>", unsafe_allow_html=True)
 
     # App cards - Row 5
-    col9, col10 = st.columns(2, gap="large")
+    col1, col2, col3 = st.columns([1, 2, 1])
 
-    with col9:
-        app9_card = """🔍
-
-**Company Intelligence**
-
-Analyze any company's LinkedIn presence - voice, strategy, and engagement patterns"""
-
-        st.button(app9_card, key="app9_btn", use_container_width=True, on_click=navigate_to_app, args=("company_intel",))
-
-    with col10:
+    with col2:
         app10_card = """🔬
 
 **Company Research**
@@ -390,8 +381,6 @@ def render_app(app_name):
             st.info("📢 Google Ads Intelligence")
         elif app_name == "claude_skills":
             st.info("📝 Content Generator")
-        elif app_name == "company_intel":
-            st.info("🔍 Company Intelligence")
         elif app_name == "company_research":
             st.info("🔬 Company Research")
 
@@ -427,10 +416,6 @@ def render_app(app_name):
     elif app_name == "claude_skills":
         from app_claude_skills import render_claude_skills_app
         render_claude_skills_app()
-
-    elif app_name == "company_intel":
-        from app_company_intel import render_company_intel_app
-        render_company_intel_app()
 
     elif app_name == "company_research":
         from app_company_research import render_company_research_app
