@@ -123,14 +123,18 @@ def render_company_research_app():
                 # STEP 0: CREATE INITIAL DATABASE RECORD
                 # ==============================================================
                 with st.spinner("💾 Initializing database record..."):
-                    save_company_analysis({
+                    save_success = save_company_analysis({
                         'linkedin_company_url': linkedin_url,
                         'website_url': company_url,
                         'company_name': company_name,
                         'research_type': 'primary',
                         'competitor_of': None
                     })
-                    st.success("✅ Database record created")
+                    if save_success:
+                        st.success("✅ Database record created")
+                    else:
+                        st.error("❌ Failed to create database record - check server logs")
+                        st.stop()
 
                 # ==============================================================
                 # STEP 1: GROK RESEARCH
@@ -511,8 +515,11 @@ def synthesize_company_report(
         # ==============================================================
 
         # Get main company data
+        print(f"[SYNTHESIS] Querying for main company with linkedin_url: {linkedin_url}")
         main_company = get_company_analysis(linkedin_company_url=linkedin_url)
+        print(f"[SYNTHESIS] Query result: {main_company.keys() if main_company else 'None/Empty'}")
         if not main_company:
+            print(f"[SYNTHESIS] ERROR: Main company data not found!")
             return {"error": "Main company data not found in database. Please run research first."}
 
         # Get competitors
