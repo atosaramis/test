@@ -864,12 +864,26 @@ def save_company_analysis(analysis_dict: Dict) -> bool:
 
         # Determine unique key - use linkedin_company_url if provided, otherwise company_url
         if 'linkedin_company_url' in analysis_dict and analysis_dict.get('linkedin_company_url'):
-            # Company Research tool - upsert by linkedin_company_url
-            response = supabase.table('linkedin_company_analysis')\
-                .upsert(data, on_conflict='linkedin_company_url')\
+            # Company Research tool - check if record exists, then update or insert
+            linkedin_url = analysis_dict.get('linkedin_company_url')
+            existing = supabase.table('linkedin_company_analysis')\
+                .select('id')\
+                .eq('linkedin_company_url', linkedin_url)\
                 .execute()
+
+            if existing.data and len(existing.data) > 0:
+                # Update existing record
+                record_id = existing.data[0]['id']
+                response = supabase.table('linkedin_company_analysis')\
+                    .update(data)\
+                    .eq('id', record_id)\
+                    .execute()
+            else:
+                # Insert new record
+                response = supabase.table('linkedin_company_analysis').insert(data).execute()
+
         elif 'company_url' in analysis_dict and analysis_dict.get('company_url'):
-            # Company Intelligence tool - upsert by company_url
+            # Company Intelligence tool - upsert by company_url (assumes unique constraint exists)
             response = supabase.table('linkedin_company_analysis')\
                 .upsert(data, on_conflict='company_url')\
                 .execute()
