@@ -124,6 +124,7 @@ def render_company_research_app():
                 # ==============================================================
                 with st.spinner("💾 Initializing database record..."):
                     save_success = save_company_analysis({
+                        'company_url': linkedin_url,  # Use linkedin_url as company_url for compatibility
                         'linkedin_company_url': linkedin_url,
                         'website_url': company_url,
                         'company_name': company_name,
@@ -151,6 +152,7 @@ def render_company_research_app():
                 else:
                     # Save to DB immediately
                     save_company_analysis({
+                        'company_url': linkedin_url,
                         'linkedin_company_url': linkedin_url,
                         'grok_research': grok_result
                     })
@@ -171,6 +173,7 @@ def render_company_research_app():
                 else:
                     # Save to DB immediately
                     save_company_analysis({
+                        'company_url': linkedin_url,
                         'linkedin_company_url': linkedin_url,
                         'claude_research': claude_result
                     })
@@ -203,6 +206,7 @@ def render_company_research_app():
 
                             # Save LinkedIn analysis to DB immediately
                             save_company_analysis({
+                                'company_url': linkedin_url,
                                 'linkedin_company_url': linkedin_url,
                                 'voice_profile': linkedin_analysis.get('voice_profile', {}),
                                 'content_pillars': linkedin_analysis.get('content_pillars', {}),
@@ -253,6 +257,7 @@ def render_company_research_app():
 
                         # Save competitor analysis to DB
                         competitor_data = {
+                            'company_url': competitor_url,  # Use competitor linkedin_url as company_url
                             'linkedin_company_url': competitor_url,
                             'company_name': competitor_name,
                             'research_type': 'competitor',
