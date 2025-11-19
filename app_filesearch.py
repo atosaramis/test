@@ -40,6 +40,9 @@ def list_file_search_stores(client) -> List[Dict[str, Any]]:
             stores_list.append({
                 "name": store.name,
                 "display_name": store.display_name,
+                "active_documents_count": store.active_documents_count,
+                "pending_documents_count": store.pending_documents_count,
+                "failed_documents_count": store.failed_documents_count,
             })
 
         return stores_list
@@ -226,7 +229,30 @@ def render_filesearch_app():
                 st.rerun()
 
     if st.session_state.filesearch_selected_store and st.session_state.filesearch_stores:
+        # Find the selected store details
+        selected_store = next(
+            (s for s in st.session_state.filesearch_stores if s["name"] == st.session_state.filesearch_selected_store),
+            None
+        )
+
         st.success(f"✅ Connected to: **{selected_display_name}**")
+
+        # Display document counts
+        if selected_store:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📄 Active Documents", selected_store.get("active_documents_count", 0))
+            with col2:
+                st.metric("⏳ Pending", selected_store.get("pending_documents_count", 0))
+            with col3:
+                st.metric("❌ Failed", selected_store.get("failed_documents_count", 0))
+
+            # Warning if no active documents
+            if selected_store.get("active_documents_count", 0) == 0:
+                if selected_store.get("pending_documents_count", 0) > 0:
+                    st.warning("⏳ Files are still being indexed. Please wait and refresh.")
+                else:
+                    st.warning("⚠️ This store has no documents. Upload files to this store in Google AI Studio.")
 
     st.markdown("---")
 
