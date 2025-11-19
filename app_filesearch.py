@@ -136,13 +136,16 @@ def chat_with_file_search(
         }
 
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         return {
             "answer": f"Error: {str(e)}",
             "citations": [],
             "media_files": [],
             "usage": {},
             "success": False,
-            "error": str(e)
+            "error": str(e),
+            "error_details": error_details
         }
 
 
@@ -162,6 +165,9 @@ def render_filesearch_app():
 
     if "filesearch_selected_store" not in st.session_state:
         st.session_state.filesearch_selected_store = None
+
+    if "filesearch_last_store" not in st.session_state:
+        st.session_state.filesearch_last_store = None
 
     if "filesearch_stores" not in st.session_state:
         st.session_state.filesearch_stores = []
@@ -191,6 +197,11 @@ def render_filesearch_app():
             )
 
             st.session_state.filesearch_selected_store = store_options[selected_display_name]
+
+            # Clear messages if store changed
+            if st.session_state.filesearch_last_store != st.session_state.filesearch_selected_store:
+                st.session_state.filesearch_messages = []
+                st.session_state.filesearch_last_store = st.session_state.filesearch_selected_store
         else:
             st.warning("No File Search stores found. Please create stores using Google AI Studio.")
             st.session_state.filesearch_selected_store = None
@@ -370,6 +381,9 @@ def render_filesearch_app():
                         "usage": response["usage"]
                     })
                 else:
-                    st.error(f"Error: {response.get('error', 'Unknown error')}")
+                    st.error(f"❌ Error: {response.get('error', 'Unknown error')}")
+                    if "error_details" in response:
+                        with st.expander("🔍 Error Details"):
+                            st.code(response["error_details"])
 
         st.rerun()
