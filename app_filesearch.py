@@ -267,10 +267,17 @@ def render_filesearch_app():
     with chat_container:
         for message in st.session_state.filesearch_messages:
             with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+                # Check if this is an error message
+                if message.get("error"):
+                    st.error(message["content"])
+                    if message.get("error_details"):
+                        with st.expander("🔍 Error Details"):
+                            st.code(message["error_details"])
+                else:
+                    st.markdown(message["content"])
 
                 # Display citations for assistant messages
-                if message["role"] == "assistant":
+                if message["role"] == "assistant" and not message.get("error"):
                     # Media files (images)
                     if "media_files" in message and message["media_files"]:
                         st.markdown("---")
@@ -384,7 +391,22 @@ def render_filesearch_app():
                     # Only rerun on success
                     st.rerun()
                 else:
-                    st.error(f"❌ Error: {response.get('error', 'Unknown error')}")
+                    # Display error
+                    error_msg = f"❌ Error: {response.get('error', 'Unknown error')}"
+                    st.error(error_msg)
                     if "error_details" in response:
                         with st.expander("🔍 Error Details"):
                             st.code(response["error_details"])
+
+                    # Save error to session state so it persists
+                    st.session_state.filesearch_messages.append({
+                        "role": "assistant",
+                        "content": error_msg,
+                        "citations": [],
+                        "media_files": [],
+                        "usage": {},
+                        "error": True,
+                        "error_details": response.get("error_details", "")
+                    })
+                    # Rerun to show the error in history
+                    st.rerun()
