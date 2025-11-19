@@ -73,18 +73,18 @@ def chat_with_file_search(
         # Configure file search tool
         from google.genai import types
 
-        file_search_tool = types.Tool(
-            file_search=types.FileSearch(
-                file_search_store=store_name
-            )
-        )
-
         # Generate response with file search
         response = client.models.generate_content(
             model=model_name,
             contents=user_message,
             config=types.GenerateContentConfig(
-                tools=[file_search_tool],
+                tools=[
+                    types.Tool(
+                        file_search=types.FileSearch(
+                            file_search_store_names=[store_name]  # Must be a list!
+                        )
+                    )
+                ],
                 system_instruction="You are a helpful AI assistant with access to uploaded documents. Answer questions accurately based on the retrieved information."
             )
         )
