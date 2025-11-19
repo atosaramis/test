@@ -380,10 +380,11 @@ def render_filesearch_app():
                         "media_files": response["media_files"],
                         "usage": response["usage"]
                     })
+
+                    # Only rerun on success
+                    st.rerun()
                 else:
                     st.error(f"❌ Error: {response.get('error', 'Unknown error')}")
                     if "error_details" in response:
                         with st.expander("🔍 Error Details"):
                             st.code(response["error_details"])
-
-        st.rerun()
