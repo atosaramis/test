@@ -67,28 +67,26 @@ def chat_with_file_search(
         Dict with answer, citations, media_files, and usage
     """
     try:
-        # Build the contents for the chat
-        contents = [msg["content"] for msg in messages if msg["role"] == "user"]
-        user_message = contents[-1] if contents else ""
+        # Get the latest user message
+        user_message = messages[-1]["content"] if messages else ""
 
-        # Use the new SDK to generate response with file search
+        # Configure file search tool
+        from google.genai import types
+
+        file_search_tool = types.Tool(
+            file_search=types.FileSearch(
+                file_search_store=store_name
+            )
+        )
+
+        # Generate response with file search
         response = client.models.generate_content(
             model=model_name,
             contents=user_message,
-            config={
-                "tools": [{"file_search": {"file_search_store": store_name}}],
-                "system_instruction": """You are a helpful AI assistant with access to uploaded documents and media files.
-
-Answer questions accurately based on the retrieved information.
-
-FORMATTING RULES:
-- Use **bold** for emphasis when needed
-- Use bullet points (-, *, or numbered lists) for lists
-- Add clear paragraph breaks between sections
-- When citing information, be specific about sources when possible
-- Keep formatting clean and readable
-- Provide detailed, comprehensive answers when appropriate"""
-            }
+            config=types.GenerateContentConfig(
+                tools=[file_search_tool],
+                system_instruction="You are a helpful AI assistant with access to uploaded documents. Answer questions accurately based on the retrieved information."
+            )
         )
 
         # Extract answer text
