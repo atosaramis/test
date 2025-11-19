@@ -73,20 +73,20 @@ def chat_with_file_search(
         # Configure file search tool
         from google.genai import types
 
-        # Generate response with file search using dict config
+        # Generate response with file search using proper types objects
         response = client.models.generate_content(
             model=model_name,
             contents=user_message,
-            config={
-                "tools": [
-                    {
-                        "file_search": {
-                            "file_search_store_names": [store_name]
-                        }
-                    }
+            config=types.GenerateContentConfig(
+                tools=[
+                    types.Tool(
+                        file_search=types.FileSearch(
+                            file_search_store_names=[store_name]
+                        )
+                    )
                 ],
-                "system_instruction": "You are a helpful AI assistant with access to uploaded documents. Answer questions accurately based on the retrieved information."
-            }
+                system_instruction="You are a helpful AI assistant with access to uploaded documents. Answer questions accurately based on the retrieved information."
+            )
         )
 
         # Extract answer text
