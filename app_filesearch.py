@@ -179,21 +179,17 @@ def render_filesearch_app():
     if "filesearch_stores" not in st.session_state:
         st.session_state.filesearch_stores = []
 
-    # Sidebar - Store Selection
-    with st.sidebar:
-        st.markdown("### 📂 Knowledge Bases")
+    # Load stores on first render
+    if not st.session_state.filesearch_stores:
+        with st.spinner("Loading knowledge bases..."):
+            st.session_state.filesearch_stores = list_file_search_stores()
 
-        # Fetch stores button
-        if st.button("🔄 Refresh Stores", use_container_width=True):
-            with st.spinner("Fetching stores..."):
-                st.session_state.filesearch_stores = list_file_search_stores()
+    # Main page - Knowledge Base Selection
+    st.markdown("### 📂 Select Knowledge Base")
 
-        # Load stores on first render
-        if not st.session_state.filesearch_stores:
-            with st.spinner("Loading stores..."):
-                st.session_state.filesearch_stores = list_file_search_stores()
+    col1, col2 = st.columns([3, 1])
 
-        # Store selection
+    with col1:
         if st.session_state.filesearch_stores:
             store_options = {
                 store["display_name"]: store["name"]
@@ -201,21 +197,30 @@ def render_filesearch_app():
             }
 
             selected_display_name = st.selectbox(
-                "Select Knowledge Base",
+                "Knowledge Base",
                 options=list(store_options.keys()),
-                index=0
+                index=0,
+                label_visibility="collapsed"
             )
 
             st.session_state.filesearch_selected_store = store_options[selected_display_name]
-
-            st.success(f"✅ Connected to: **{selected_display_name}**")
         else:
             st.warning("No File Search stores found. Please create stores using Google AI Studio.")
             st.session_state.filesearch_selected_store = None
 
-        st.divider()
+    with col2:
+        if st.button("🔄 Refresh", use_container_width=True):
+            with st.spinner("Refreshing..."):
+                st.session_state.filesearch_stores = list_file_search_stores()
+                st.rerun()
 
-        # Model selection
+    if st.session_state.filesearch_selected_store and st.session_state.filesearch_stores:
+        st.success(f"✅ Connected to: **{selected_display_name}**")
+
+    st.markdown("---")
+
+    # Sidebar - Settings
+    with st.sidebar:
         st.markdown("### ⚙️ Settings")
         model_name = st.selectbox(
             "Model",
@@ -247,7 +252,7 @@ def render_filesearch_app():
 
     # Main chat area
     if not st.session_state.filesearch_selected_store:
-        st.info("👈 Please select a knowledge base from the sidebar to start chatting.")
+        st.info("👆 Please select a knowledge base above to start chatting.")
         return
 
     # Display chat messages
