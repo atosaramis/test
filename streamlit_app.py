@@ -302,9 +302,9 @@ Generate Samba blog posts and LinkedIn content from your text using AI"""
     st.markdown("<br>", unsafe_allow_html=True)
 
     # App cards - Row 5
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col9, col10 = st.columns(2, gap="large")
 
-    with col2:
+    with col9:
         app10_card = """🔬
 
 **Company Research**
@@ -313,12 +313,7 @@ Multi-source AI research combining Grok, Claude, and LinkedIn for comprehensive 
 
         st.button(app10_card, key="app10_btn", use_container_width=True, on_click=navigate_to_app, args=("company_research",))
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # App cards - Row 6
-    col1, col2, col3 = st.columns([1, 2, 1])
-
-    with col2:
+    with col10:
         app11_card = """📚
 
 **FileSearch Chat**

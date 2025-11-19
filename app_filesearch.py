@@ -30,17 +30,17 @@ def initialize_gemini_client():
 
 
 def list_file_search_stores() -> List[Dict[str, Any]]:
-    """List all available File Search stores."""
+    """List all available File Search stores (corpora)."""
     try:
-        # List stores using the Gemini API
-        stores = genai.list_file_search_stores(page_size=20)
+        # List corpora using the Gemini API
+        corpora = genai.list_corpora(page_size=20)
 
         store_list = []
-        for store in stores:
+        for corpus in corpora:
             store_list.append({
-                "name": store.name,  # e.g., "fileSearchStores/abc123"
-                "display_name": store.display_name,
-                "create_time": store.create_time if hasattr(store, 'create_time') else None,
+                "name": corpus.name,  # e.g., "corpora/abc123"
+                "display_name": corpus.display_name,
+                "create_time": corpus.create_time if hasattr(corpus, 'create_time') else None,
             })
 
         return store_list
@@ -76,16 +76,19 @@ def chat_with_file_search(
                 "parts": [{"text": msg["content"]}]
             })
 
-        # Configure the model with File Search tool
+        # Configure the model with retrieval tool
+        # Create a retrieval tool that uses the corpus
+        retrieval_tool = genai.protos.Tool(
+            retrieval=genai.protos.Retrieval(
+                vertex_rag_store=genai.protos.VertexRagStore(
+                    rag_corpora=[store_name]
+                )
+            )
+        )
+
         model = genai.GenerativeModel(
             model_name=model_name,
-            tools=[
-                {
-                    "file_search": {
-                        "file_search_store": store_name
-                    }
-                }
-            ],
+            tools=[retrieval_tool],
             system_instruction="""You are a helpful AI assistant with access to uploaded documents and media files.
 
 Answer questions accurately based on the retrieved information.
