@@ -73,14 +73,14 @@ def chat_with_file_search(
         # Configure file search tool
         from google.genai import types
 
-        # Generate response with file search using proper types objects
+        # Try using google_file_search parameter instead
         response = client.models.generate_content(
             model=model_name,
             contents=user_message,
             config=types.GenerateContentConfig(
                 tools=[
                     types.Tool(
-                        file_search=types.FileSearch(
+                        google_file_search=types.GoogleFileSearch(
                             file_search_store_names=[store_name]
                         )
                     )
