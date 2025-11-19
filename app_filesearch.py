@@ -70,17 +70,17 @@ def chat_with_file_search(
         # Get the latest user message
         user_message = messages[-1]["content"] if messages else ""
 
-        # Configure file search tool
+        # Configure file search tool - using EXACT syntax from Google documentation
         from google.genai import types
 
-        # Try using google_file_search parameter instead
+        # Create the config exactly as shown in official docs
         response = client.models.generate_content(
             model=model_name,
             contents=user_message,
             config=types.GenerateContentConfig(
                 tools=[
                     types.Tool(
-                        google_file_search=types.GoogleFileSearch(
+                        file_search=types.FileSearch(
                             file_search_store_names=[store_name]
                         )
                     )
