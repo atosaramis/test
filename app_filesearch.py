@@ -72,6 +72,8 @@ def chat_with_file_search(
     try:
         # Get the latest user message
         user_message = messages[-1]["content"] if messages else ""
+        # Clean up message - remove quotes and whitespace
+        user_message = user_message.strip().strip('"').strip("'")
 
         # Call REST API directly since Python SDK file_search support is broken
         import requests
