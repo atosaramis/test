@@ -70,59 +70,77 @@ def chat_with_file_search(
         # Get the latest user message
         user_message = messages[-1]["content"] if messages else ""
 
-        # Use plain dict config like the JavaScript SDK does
-        # Matching the structure from the working Next.js app
-        response = client.models.generate_content(
-            model=model_name,
-            contents=user_message,
-            config={
-                "tools": [
-                    {
-                        "file_search": {
-                            "file_search_store_names": [store_name]
-                        }
-                    }
-                ],
-                "system_instruction": "You are a helpful AI assistant with access to uploaded documents. Answer questions accurately based on the retrieved information."
-            }
-        )
+        # Call REST API directly since Python SDK file_search support is broken
+        import requests
+        import os
 
-        # Extract answer text
-        answer = response.text if hasattr(response, 'text') and response.text else "No response generated."
+        api_key = os.environ.get("GOOGLE_GENAI_API_KEY") or st.secrets.get("GOOGLE_GENAI_API_KEY")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key
+        }
+
+        payload = {
+            "contents": [{
+                "parts": [{"text": user_message}]
+            }],
+            "tools": [{
+                "file_search": {
+                    "file_search_store_names": [store_name]
+                }
+            }],
+            "systemInstruction": {
+                "parts": [{"text": "You are a helpful AI assistant with access to uploaded documents. Answer questions accurately based on the retrieved information."}]
+            }
+        }
+
+        rest_response = requests.post(url, headers=headers, json=payload)
+        rest_response.raise_for_status()
+        response_data = rest_response.json()
+
+        # Extract answer text from REST response
+        answer = "No response generated."
+        if "candidates" in response_data and len(response_data["candidates"]) > 0:
+            candidate = response_data["candidates"][0]
+            if "content" in candidate and "parts" in candidate["content"]:
+                text_parts = [part.get("text", "") for part in candidate["content"]["parts"] if "text" in part]
+                answer = "".join(text_parts)
 
         # Extract citations from grounding metadata
         citations = []
         media_files = []
 
-        if hasattr(response, 'candidates') and len(response.candidates) > 0:
-            candidate = response.candidates[0]
+        if "candidates" in response_data and len(response_data["candidates"]) > 0:
+            candidate = response_data["candidates"][0]
 
             # Check for grounding metadata
-            if hasattr(candidate, 'grounding_metadata') and candidate.grounding_metadata:
-                grounding = candidate.grounding_metadata
+            if "groundingMetadata" in candidate:
+                grounding = candidate["groundingMetadata"]
 
                 # Extract grounding chunks (document citations)
-                if hasattr(grounding, 'grounding_chunks') and grounding.grounding_chunks:
-                    for i, chunk in enumerate(grounding.grounding_chunks):
-                        if hasattr(chunk, 'retrieved_context'):
-                            retrieved = chunk.retrieved_context
+                if "groundingChunks" in grounding:
+                    for i, chunk in enumerate(grounding["groundingChunks"]):
+                        if "retrievedContext" in chunk:
+                            retrieved = chunk["retrievedContext"]
 
                             citation = {
                                 "id": f"citation-{i}",
-                                "text": retrieved.text if hasattr(retrieved, 'text') else "",
+                                "text": retrieved.get("text", ""),
                                 "document_name": "Document",  # API limitation
-                                "uri": retrieved.uri if hasattr(retrieved, 'uri') else ""
+                                "uri": retrieved.get("uri", "")
                             }
                             citations.append(citation)
 
         # Extract usage metadata
         usage = {}
-        if hasattr(response, 'usage_metadata') and response.usage_metadata:
-            usage_meta = response.usage_metadata
+        if "usageMetadata" in response_data:
+            usage_meta = response_data["usageMetadata"]
             usage = {
-                "input_tokens": usage_meta.prompt_token_count if hasattr(usage_meta, 'prompt_token_count') else 0,
-                "output_tokens": usage_meta.candidates_token_count if hasattr(usage_meta, 'candidates_token_count') else 0,
-                "total_tokens": usage_meta.total_token_count if hasattr(usage_meta, 'total_token_count') else 0,
+                "input_tokens": usage_meta.get("promptTokenCount", 0),
+                "output_tokens": usage_meta.get("candidatesTokenCount", 0),
+                "total_tokens": usage_meta.get("totalTokenCount", 0),
             }
 
         return {
