@@ -6,7 +6,7 @@ Read-only interface for querying documents and media files using AI
 import streamlit as st
 import os
 from typing import List, Dict, Any, Optional
-import google.generativeai as genai
+from google import genai
 
 
 def get_credential(key: str, default=None):
@@ -17,44 +17,49 @@ def get_credential(key: str, default=None):
         return os.environ.get(key, default)
 
 
-def initialize_gemini_client():
-    """Initialize Google Gemini client with API key."""
+def get_genai_client():
+    """Get Google Gen AI client with API key."""
     api_key = get_credential("GOOGLE_GENAI_API_KEY")
 
     if not api_key:
         st.error("⚠️ GOOGLE_GENAI_API_KEY not configured in secrets")
         st.stop()
 
-    genai.configure(api_key=api_key)
-    return genai
+    client = genai.Client(api_key=api_key)
+    return client
 
 
-def get_corpus_name_from_input(corpus_input: str) -> str:
-    """
-    Convert user input to proper corpus name format.
+def list_file_search_stores(client) -> List[Dict[str, Any]]:
+    """List all available File Search stores."""
+    try:
+        # List stores using the new Gen AI SDK (like Node.js version)
+        stores_list = []
 
-    Args:
-        corpus_input: User input (can be full name or just ID)
+        # client.file_search_stores.list() returns a pager
+        for store in client.file_search_stores.list(config={"page_size": 20}):
+            stores_list.append({
+                "name": store.name,
+                "display_name": store.display_name,
+            })
 
-    Returns:
-        Properly formatted corpus name
-    """
-    if corpus_input.startswith("corpora/"):
-        return corpus_input
-    else:
-        return f"corpora/{corpus_input}"
+        return stores_list
+    except Exception as e:
+        st.error(f"Error fetching stores: {str(e)}")
+        return []
 
 
 def chat_with_file_search(
+    client,
     store_name: str,
     messages: List[Dict[str, str]],
-    model_name: str = "gemini-2.5-flash"
+    model_name: str = "gemini-2.0-flash-exp"
 ) -> Dict[str, Any]:
     """
     Chat with a File Search store using Gemini.
 
     Args:
-        store_name: Full store name (e.g., "fileSearchStores/abc123")
+        client: Google Gen AI client
+        store_name: Full store name (e.g., "file_search_stores/abc123")
         messages: List of message dicts with 'role' and 'content'
         model_name: Gemini model to use
 
@@ -62,30 +67,17 @@ def chat_with_file_search(
         Dict with answer, citations, media_files, and usage
     """
     try:
-        # Build the contents array for Gemini
-        contents = []
+        # Build the contents for the chat
+        contents = [msg["content"] for msg in messages if msg["role"] == "user"]
+        user_message = contents[-1] if contents else ""
 
-        for msg in messages:
-            role = "user" if msg["role"] == "user" else "model"
-            contents.append({
-                "role": role,
-                "parts": [{"text": msg["content"]}]
-            })
-
-        # Configure the model with retrieval tool
-        # Create a retrieval tool that uses the corpus
-        retrieval_tool = genai.protos.Tool(
-            retrieval=genai.protos.Retrieval(
-                vertex_rag_store=genai.protos.VertexRagStore(
-                    rag_corpora=[store_name]
-                )
-            )
-        )
-
-        model = genai.GenerativeModel(
-            model_name=model_name,
-            tools=[retrieval_tool],
-            system_instruction="""You are a helpful AI assistant with access to uploaded documents and media files.
+        # Use the new SDK to generate response with file search
+        response = client.models.generate_content(
+            model=model_name,
+            contents=user_message,
+            config={
+                "tools": [{"file_search": {"file_search_store": store_name}}],
+                "system_instruction": """You are a helpful AI assistant with access to uploaded documents and media files.
 
 Answer questions accurately based on the retrieved information.
 
@@ -96,13 +88,11 @@ FORMATTING RULES:
 - When citing information, be specific about sources when possible
 - Keep formatting clean and readable
 - Provide detailed, comprehensive answers when appropriate"""
+            }
         )
 
-        # Generate response
-        response = model.generate_content(contents)
-
         # Extract answer text
-        answer = response.text if response.text else "No response generated."
+        answer = response.text if hasattr(response, 'text') and response.text else "No response generated."
 
         # Extract citations from grounding metadata
         citations = []
@@ -162,7 +152,7 @@ def render_filesearch_app():
     """Render the FileSearch Chat application."""
 
     # Initialize client
-    initialize_gemini_client()
+    client = get_genai_client()
 
     # Page header
     st.markdown("## 📚 FileSearch Chat")
@@ -175,28 +165,46 @@ def render_filesearch_app():
     if "filesearch_selected_store" not in st.session_state:
         st.session_state.filesearch_selected_store = None
 
+    if "filesearch_stores" not in st.session_state:
+        st.session_state.filesearch_stores = []
+
+    # Load stores on first render
+    if not st.session_state.filesearch_stores:
+        with st.spinner("Loading file search stores..."):
+            st.session_state.filesearch_stores = list_file_search_stores(client)
+
     # Main page - Knowledge Base Selection
-    st.markdown("### 📂 Enter Corpus Name")
+    st.markdown("### 📂 Select Knowledge Base")
 
     col1, col2 = st.columns([3, 1])
 
     with col1:
-        corpus_input = st.text_input(
-            "Corpus ID or Name",
-            placeholder="e.g., corpora/your-corpus-id or just your-corpus-id",
-            help="Enter your Gemini corpus name from Google AI Studio",
-            label_visibility="collapsed"
-        )
+        if st.session_state.filesearch_stores:
+            store_options = {
+                store["display_name"]: store["name"]
+                for store in st.session_state.filesearch_stores
+            }
+
+            selected_display_name = st.selectbox(
+                "Knowledge Base",
+                options=list(store_options.keys()),
+                index=0,
+                label_visibility="collapsed"
+            )
+
+            st.session_state.filesearch_selected_store = store_options[selected_display_name]
+        else:
+            st.warning("No File Search stores found. Please create stores using Google AI Studio.")
+            st.session_state.filesearch_selected_store = None
 
     with col2:
-        connect_btn = st.button("🔗 Connect", use_container_width=True, type="primary")
+        if st.button("🔄 Refresh", use_container_width=True):
+            with st.spinner("Refreshing..."):
+                st.session_state.filesearch_stores = list_file_search_stores(client)
+                st.rerun()
 
-    if connect_btn and corpus_input:
-        st.session_state.filesearch_selected_store = get_corpus_name_from_input(corpus_input)
-        st.success(f"✅ Connected to: **{st.session_state.filesearch_selected_store}**")
-
-    if st.session_state.filesearch_selected_store:
-        st.info(f"📚 Using corpus: `{st.session_state.filesearch_selected_store}`")
+    if st.session_state.filesearch_selected_store and st.session_state.filesearch_stores:
+        st.success(f"✅ Connected to: **{selected_display_name}**")
 
     st.markdown("---")
 
@@ -205,8 +213,9 @@ def render_filesearch_app():
         st.markdown("### ⚙️ Settings")
         model_name = st.selectbox(
             "Model",
-            options=["gemini-2.5-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
-            index=0
+            options=["gemini-2.0-flash-exp", "gemini-2.5-flash", "gemini-1.5-pro"],
+            index=0,
+            help="File Search requires Gemini 2.0+ models"
         )
 
         # Clear chat button
@@ -311,6 +320,7 @@ def render_filesearch_app():
 
                 # Call File Search API
                 response = chat_with_file_search(
+                    client=client,
                     store_name=st.session_state.filesearch_selected_store,
                     messages=api_messages,
                     model_name=model_name

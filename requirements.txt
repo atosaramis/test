@@ -17,5 +17,5 @@ xai-sdk>=1.4.0
 # Anthropic SDK - For Claude Skills API
 anthropic>=0.18.0
 
-# Google Generative AI SDK - For FileSearch Chat
-google-generativeai>=0.8.0
+# Google Gen AI SDK - For FileSearch Chat (new SDK, replaces google-generativeai)
+google-genai>=0.6.0
