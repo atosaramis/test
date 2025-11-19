@@ -202,9 +202,6 @@ def render_dashboard():
             # Clear transcripts on logout
             if "transcripts" in st.session_state:
                 del st.session_state.transcripts
-            # Clear FileSearch chat history on logout
-            if "filesearch_messages" in st.session_state:
-                del st.session_state.filesearch_messages
             st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -313,15 +310,6 @@ Multi-source AI research combining Grok, Claude, and LinkedIn for comprehensive 
 
         st.button(app10_card, key="app10_btn", use_container_width=True, on_click=navigate_to_app, args=("company_research",))
 
-    with col10:
-        app11_card = """📚
-
-**FileSearch Chat**
-
-Chat with your uploaded documents using Google Gemini"""
-
-        st.button(app11_card, key="app11_btn", use_container_width=True, on_click=navigate_to_app, args=("filesearch",))
-
     # Suggest Workflow Button
     st.markdown("<br><br>", unsafe_allow_html=True)
 
@@ -372,9 +360,6 @@ def render_app(app_name):
             # Clear transcripts on logout
             if "transcripts" in st.session_state:
                 del st.session_state.transcripts
-            # Clear FileSearch chat history on logout
-            if "filesearch_messages" in st.session_state:
-                del st.session_state.filesearch_messages
             st.query_params.clear()
             st.rerun()
 
@@ -398,8 +383,6 @@ def render_app(app_name):
             st.info("📝 Content Generator")
         elif app_name == "company_research":
             st.info("🔬 Company Research")
-        elif app_name == "filesearch":
-            st.info("📚 FileSearch Chat")
 
     # Import and render the appropriate app
     if app_name == "linkedin":
@@ -437,10 +420,6 @@ def render_app(app_name):
     elif app_name == "company_research":
         from app_company_research import render_company_research_app
         render_company_research_app()
-
-    elif app_name == "filesearch":
-        from app_filesearch import render_filesearch_app
-        render_filesearch_app()
 
     else:
         st.error(f"Unknown app: {app_name}")
