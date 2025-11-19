@@ -52,7 +52,7 @@ def chat_with_file_search(
     client,
     store_name: str,
     messages: List[Dict[str, str]],
-    model_name: str = "gemini-2.0-flash-exp"
+    model_name: str = "gemini-2.5-flash"
 ) -> Dict[str, Any]:
     """
     Chat with a File Search store using Gemini.
@@ -90,10 +90,7 @@ def chat_with_file_search(
                 "file_search": {
                     "file_search_store_names": [store_name]
                 }
-            }],
-            "systemInstruction": {
-                "parts": [{"text": "You are a helpful AI assistant with access to uploaded documents. Answer questions accurately based on the retrieved information."}]
-            }
+            }]
         }
 
         rest_response = requests.post(url, headers=headers, json=payload)
@@ -238,9 +235,9 @@ def render_filesearch_app():
         st.markdown("### ⚙️ Settings")
         model_name = st.selectbox(
             "Model",
-            options=["gemini-2.0-flash-exp", "gemini-2.5-flash", "gemini-1.5-pro"],
+            options=["gemini-2.5-flash", "gemini-2.5-pro"],
             index=0,
-            help="File Search requires Gemini 2.0+ models"
+            help="⚠️ ONLY Gemini 2.5 models support File Search"
         )
 
         # Clear chat button
