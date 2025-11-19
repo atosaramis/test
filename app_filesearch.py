@@ -29,24 +29,20 @@ def initialize_gemini_client():
     return genai
 
 
-def list_file_search_stores() -> List[Dict[str, Any]]:
-    """List all available File Search stores (corpora)."""
-    try:
-        # List corpora using the Gemini API
-        corpora = genai.list_corpora(page_size=20)
+def get_corpus_name_from_input(corpus_input: str) -> str:
+    """
+    Convert user input to proper corpus name format.
 
-        store_list = []
-        for corpus in corpora:
-            store_list.append({
-                "name": corpus.name,  # e.g., "corpora/abc123"
-                "display_name": corpus.display_name,
-                "create_time": corpus.create_time if hasattr(corpus, 'create_time') else None,
-            })
+    Args:
+        corpus_input: User input (can be full name or just ID)
 
-        return store_list
-    except Exception as e:
-        st.error(f"Error fetching stores: {str(e)}")
-        return []
+    Returns:
+        Properly formatted corpus name
+    """
+    if corpus_input.startswith("corpora/"):
+        return corpus_input
+    else:
+        return f"corpora/{corpus_input}"
 
 
 def chat_with_file_search(
@@ -179,46 +175,28 @@ def render_filesearch_app():
     if "filesearch_selected_store" not in st.session_state:
         st.session_state.filesearch_selected_store = None
 
-    if "filesearch_stores" not in st.session_state:
-        st.session_state.filesearch_stores = []
-
-    # Load stores on first render
-    if not st.session_state.filesearch_stores:
-        with st.spinner("Loading knowledge bases..."):
-            st.session_state.filesearch_stores = list_file_search_stores()
-
     # Main page - Knowledge Base Selection
-    st.markdown("### 📂 Select Knowledge Base")
+    st.markdown("### 📂 Enter Corpus Name")
 
     col1, col2 = st.columns([3, 1])
 
     with col1:
-        if st.session_state.filesearch_stores:
-            store_options = {
-                store["display_name"]: store["name"]
-                for store in st.session_state.filesearch_stores
-            }
-
-            selected_display_name = st.selectbox(
-                "Knowledge Base",
-                options=list(store_options.keys()),
-                index=0,
-                label_visibility="collapsed"
-            )
-
-            st.session_state.filesearch_selected_store = store_options[selected_display_name]
-        else:
-            st.warning("No File Search stores found. Please create stores using Google AI Studio.")
-            st.session_state.filesearch_selected_store = None
+        corpus_input = st.text_input(
+            "Corpus ID or Name",
+            placeholder="e.g., corpora/your-corpus-id or just your-corpus-id",
+            help="Enter your Gemini corpus name from Google AI Studio",
+            label_visibility="collapsed"
+        )
 
     with col2:
-        if st.button("🔄 Refresh", use_container_width=True):
-            with st.spinner("Refreshing..."):
-                st.session_state.filesearch_stores = list_file_search_stores()
-                st.rerun()
+        connect_btn = st.button("🔗 Connect", use_container_width=True, type="primary")
 
-    if st.session_state.filesearch_selected_store and st.session_state.filesearch_stores:
-        st.success(f"✅ Connected to: **{selected_display_name}**")
+    if connect_btn and corpus_input:
+        st.session_state.filesearch_selected_store = get_corpus_name_from_input(corpus_input)
+        st.success(f"✅ Connected to: **{st.session_state.filesearch_selected_store}**")
+
+    if st.session_state.filesearch_selected_store:
+        st.info(f"📚 Using corpus: `{st.session_state.filesearch_selected_store}`")
 
     st.markdown("---")
 
@@ -255,7 +233,14 @@ def render_filesearch_app():
 
     # Main chat area
     if not st.session_state.filesearch_selected_store:
-        st.info("👆 Please select a knowledge base above to start chatting.")
+        st.info("👆 Please enter your corpus name above to start chatting.")
+        st.markdown("""
+        **How to get your corpus name:**
+        1. Go to [Google AI Studio](https://aistudio.google.com/)
+        2. Navigate to your File Search stores/corpora
+        3. Copy the corpus ID (e.g., `corpora/abc123xyz`)
+        4. Paste it above and click Connect
+        """)
         return
 
     # Display chat messages

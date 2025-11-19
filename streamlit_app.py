@@ -318,7 +318,7 @@ Multi-source AI research combining Grok, Claude, and LinkedIn for comprehensive 
 
 **FileSearch Chat**
 
-Chat with pre-uploaded documents and media using Google Gemini AI"""
+Chat with your uploaded documents using Google Gemini"""
 
         st.button(app11_card, key="app11_btn", use_container_width=True, on_click=navigate_to_app, args=("filesearch",))
 
