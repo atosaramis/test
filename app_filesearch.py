@@ -96,7 +96,16 @@ def chat_with_file_search(
             }]
         }
 
+        # DEBUG: Log what we're sending
+        st.write("DEBUG - Store name:", store_name)
+        st.write("DEBUG - Payload:", payload)
+
         rest_response = requests.post(url, headers=headers, json=payload)
+
+        # DEBUG: Log response
+        st.write("DEBUG - Response status:", rest_response.status_code)
+        st.write("DEBUG - Response:", rest_response.text[:500])
+
         rest_response.raise_for_status()
         response_data = rest_response.json()
 
